@@ -22,7 +22,18 @@ final class Updater {
         controller != nil
     }
 
-    /// Setting both choices here keeps Sparkle from asking "check automatically?" on the second launch.
+    var checksAutomatically: Bool {
+        get { controller?.updater.automaticallyChecksForUpdates ?? false }
+        set { controller?.updater.automaticallyChecksForUpdates = newValue }
+    }
+
+    var installsAutomatically: Bool {
+        get { controller?.updater.automaticallyDownloadsUpdates ?? false }
+        set { controller?.updater.automaticallyDownloadsUpdates = newValue }
+    }
+
+    /// The first time, both choices are made here (on), which keeps Sparkle from asking "check automatically?" on the
+    /// second launch; after that they are whatever the settings window says.
     func start() {
         guard Self.allowed, controller == nil else { return }
         let controller = SPUStandardUpdaterController(
@@ -30,8 +41,10 @@ final class Updater {
             updaterDelegate: nil,
             userDriverDelegate: nil
         )
-        controller.updater.automaticallyChecksForUpdates = true
-        controller.updater.automaticallyDownloadsUpdates = true
+        if UserDefaults.standard.object(forKey: "SUEnableAutomaticChecks") == nil {
+            controller.updater.automaticallyChecksForUpdates = true
+            controller.updater.automaticallyDownloadsUpdates = true
+        }
         self.controller = controller
         controller.startUpdater()
     }

@@ -8,6 +8,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var spacesBar: SpacesBar?
     private var overlays: StackOverlays?
     private lazy var room = RoomKeeper(yabai: session.yabai)
+    private let settings = SettingsWindow()
+    private var drawnSettings = Preferences.signature
 
     func applicationDidFinishLaunching(_: Notification) {
         Updater.shared.start()
@@ -34,6 +36,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.overlays?.redraw(self?.session.snapshot) }
+        }
+        // A choice made in the settings window or the menu: redraw what it changes, and nothing for other defaults.
+        NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.settingsChanged() }
         }
         session.start()
         drawSpaces()
@@ -62,7 +70,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task { await room.update(snapshot, placement: placement, mode: mode, depth: depth, style: style) }
     }
 
-    private func indicatorsChanged() {
+    private func settingsChanged() {
+        let signature = Preferences.signature
+        guard signature != drawnSettings else { return }
+        drawnSettings = signature
+        drawSpaces()
         overlays?.redraw(session.snapshot)
         makeRoom()
     }
@@ -78,10 +90,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         menu.addItem(.separator())
         menu.addItem(indicatorMenu())
-        menu.addItem(toggle("Hide Empty Spaces", on: Preferences.hideEmptySpaces, action: #selector(toggleHideEmpty)))
-        menu.addItem(toggle(
-            "One Item per Display", on: Preferences.itemPerDisplay, action: #selector(toggleItemPerDisplay)
-        ))
+        let settingsItem = NSMenuItem(title: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
+        settingsItem.target = self
+        menu.addItem(settingsItem)
         menu.addItem(.separator())
         menu.addItem(disabled(build.label))
         let check = NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
@@ -166,24 +177,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func chooseIndicatorStyle(_ item: NSMenuItem) {
         guard let raw = item.representedObject as? String, let style = IndicatorStyle(rawValue: raw) else { return }
         Preferences.indicatorStyle = style
-        indicatorsChanged()
+        if style == .tabs, Preferences.indicatorPlacement != .bottom { Preferences.indicatorPlacement = .top }
     }
 
     @objc private func chooseIndicatorPlacement(_ item: NSMenuItem) {
         guard let raw = item.representedObject as? String,
               let placement = IndicatorPlacement(rawValue: raw) else { return }
         Preferences.indicatorPlacement = placement
-        indicatorsChanged()
     }
 
     @objc private func toggleBoxedIn() {
         Preferences.widenGapWhenBoxedIn.toggle()
-        indicatorsChanged()
     }
 
     @objc private func toggleMakeRoom() {
         Preferences.makeRoom.toggle()
-        indicatorsChanged()
     }
 
     private func icon(for pid: Int32) -> NSImage? {
@@ -221,14 +229,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         session.focus(window: item.tag)
     }
 
-    @objc private func toggleHideEmpty() {
-        Preferences.hideEmptySpaces.toggle()
-        drawSpaces()
-    }
-
-    @objc private func toggleItemPerDisplay() {
-        Preferences.itemPerDisplay.toggle()
-        drawSpaces()
+    @objc private func showSettings() {
+        settings.show()
     }
 
     @objc private func checkForUpdates() {
