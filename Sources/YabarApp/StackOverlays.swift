@@ -199,8 +199,10 @@ final class IndicatorView: NSView {
         let tile = NSBezierPath(roundedRect: entry.rect, xRadius: 5, yRadius: 5)
         NSColor.black.withAlphaComponent(0.45 * alpha).setFill()
         tile.fill()
+        // The view is flipped (y down); without respectFlipped the icon would be drawn upside down.
         entry.icon?.draw(
-            in: entry.rect.insetBy(dx: 1.5, dy: 1.5), from: .zero, operation: .sourceOver, fraction: alpha
+            in: entry.rect.insetBy(dx: 1.5, dy: 1.5), from: .zero, operation: .sourceOver, fraction: alpha,
+            respectFlipped: true, hints: nil
         )
         if entry.isTop, stackHasFocus {
             NSColor.controlAccentColor.setStroke()
