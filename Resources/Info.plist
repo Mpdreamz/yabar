@@ -15,7 +15,7 @@
   <!-- Sparkle: the appcast the release workflow attaches to every release, and the public half of the key that signs
        each update (written by the sparkle option of scripts/release-secrets.sh). Empty: the updater stays off. -->
   <key>SUFeedURL</key><string>https://github.com/mpdreamz/yabar/releases/latest/download/appcast.xml</string>
-  <key>SUPublicEDKey</key><string></string>
+  <key>SUPublicEDKey</key><string>WOMgu5uqlhj9Sw+eAttmKkVhNAzZi6PMIpvlV3bBsR0=</string>
   <key>SUEnableInstallerLauncherService</key><false/>
   <!-- The appcast itself must carry the same key's signature, and an update is checked before it is unpacked. -->
   <key>SURequireSignedFeed</key><true/>
