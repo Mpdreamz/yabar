@@ -46,11 +46,9 @@ final class StackOverlays {
             return
         }
         let placement = StackPlacement.resolve(
-            stack, in: snapshot, placement: Preferences.indicatorPlacement, room: Preferences.roomMode, style: style
+            stack, in: snapshot, placement: Preferences.indicatorPlacement, style: style
         )
-        let layout = IndicatorLayout(
-            stack: stack, top: tops.top(of: stack.id), side: placement.side, outside: placement.outside, style: style
-        )
+        let layout = IndicatorLayout(stack: stack, top: tops.top(of: stack.id), side: placement.side, style: style)
         let panel = panels[stack.id] ?? IndicatorPanel(focus: focus, close: close)
         panels[stack.id] = panel
         panel.show(layout, stack: stack, style: style, space: stack.id.space)

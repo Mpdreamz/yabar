@@ -44,41 +44,32 @@ struct StackTopsTests {
 }
 
 struct IndicatorLayoutTests {
-    @Test func insideALeftStackBelowTheTitleBar() throws {
+    @Test func besideALeftStack() throws {
         let stack = try Fixtures.snapshot().stacks[0]
-        let layout = IndicatorLayout(stack: stack, top: 102, side: .left, outside: false, style: .icons)
-        #expect(layout.bounds == Frame(x: 11, y: 77, w: 24, h: 84))
+        let layout = IndicatorLayout(stack: stack, top: 102, side: .left, style: .icons)
+        #expect(layout.bounds == Frame(x: 8 - 3 - 24, y: 44, w: 24, h: 84))
         #expect(layout.items.map(\.windowID) == [101, 102, 103])
         #expect(layout.items.map(\.isTop) == [false, true, false])
         #expect(layout.items[1].frame == Frame(x: 0, y: 30, w: 24, h: 24))
     }
 
-    @Test func outsideTheStackInTheRoomMadeForIt() throws {
+    @Test func pillsOnTheOtherSides() throws {
         let stack = try Fixtures.snapshot().stacks[0]
-        let left = IndicatorLayout(stack: stack, top: nil, side: .left, outside: true, style: .pills)
-        #expect(left.bounds == Frame(x: 0, y: 44, w: 5, h: 84))
-        let right = IndicatorLayout(stack: stack, top: nil, side: .right, outside: false, style: .pills)
-        #expect(right.bounds.x == 852)
+        let right = IndicatorLayout(stack: stack, top: nil, side: .right, style: .pills)
+        #expect(right.bounds.x == 863)
         #expect(right.items.filter(\.isTop).isEmpty)
-    }
-
-    @Test func topRunsAcrossPastTheTitleBarButtons() throws {
-        let stack = try Fixtures.snapshot().stacks[0]
-        let inside = IndicatorLayout(stack: stack, top: nil, side: .top, outside: false, style: .icons)
-        #expect(inside.bounds == Frame(x: 86, y: 44, w: 84, h: 24))
-        #expect(inside.items[2].frame == Frame(x: 60, y: 0, w: 24, h: 24))
-        let outside = IndicatorLayout(stack: stack, top: nil, side: .bottom, outside: true, style: .pills)
-        #expect(outside.bounds == Frame(x: 11, y: 1112, w: 84, h: 5))
-        #expect(outside.items[0].frame == Frame(x: 0, y: 0, w: 24, h: 5))
+        let bottom = IndicatorLayout(stack: stack, top: nil, side: .bottom, style: .pills)
+        #expect(bottom.bounds == Frame(x: 11, y: 1112, w: 84, h: 5))
+        #expect(bottom.items[0].frame == Frame(x: 0, y: 0, w: 24, h: 5))
     }
 
     @Test func shrinksToFitAShortStack() throws {
         var snapshot = try Fixtures.snapshot()
         for index in snapshot.windows.indices where snapshot.windows[index].space == 1 {
-            snapshot.windows[index].frame.h = 100
+            snapshot.windows[index].frame.h = 60
         }
-        let layout = IndicatorLayout(stack: snapshot.stacks[0], top: nil, side: .left, outside: false, style: .icons)
-        #expect(layout.bounds.h <= 61)
+        let layout = IndicatorLayout(stack: snapshot.stacks[0], top: nil, side: .left, style: .icons)
+        #expect(layout.bounds.h <= 54)
     }
 }
 
@@ -105,29 +96,20 @@ struct StackPlacementTests {
 
     @Test func theSideAskedForWhenItFacesTheScreen() throws {
         let snapshot = try Fixtures.snapshot()
-        let placement = StackPlacement.resolve(snapshot.stacks[0], in: snapshot, placement: .top, room: .widenGap)
-        #expect(placement == StackPlacement(side: .top, outside: true, meetsScreen: true))
+        let placement = StackPlacement.resolve(snapshot.stacks[0], in: snapshot, placement: .top)
+        #expect(placement == StackPlacement(side: .top, meetsScreen: true))
     }
 
     @Test func turnsToTheScreenRatherThanWidenTheGap() throws {
         let snapshot = try Fixtures.snapshot()
-        let placement = StackPlacement.resolve(snapshot.stacks[0], in: snapshot, placement: .right, room: .widenGap)
-        #expect(placement == StackPlacement(side: .left, outside: true, meetsScreen: true))
+        let placement = StackPlacement.resolve(snapshot.stacks[0], in: snapshot, placement: .right)
+        #expect(placement == StackPlacement(side: .left, meetsScreen: true))
     }
 
-    @Test func boxedInWidensTheGapOrDrawsInside() throws {
+    @Test func boxedInKeepsTheSideAskedFor() throws {
         let snapshot = try boxedIn()
-        let stack = snapshot.stacks[0]
-        let gap = StackPlacement.resolve(stack, in: snapshot, placement: .right, room: .widenGap)
-        #expect(gap == StackPlacement(side: .right, outside: true, meetsScreen: false))
-        let inside = StackPlacement.resolve(stack, in: snapshot, placement: .right, room: .paddingOnly)
-        #expect(inside == StackPlacement(side: .right, outside: false, meetsScreen: false))
-    }
-
-    @Test func noRoomKeepsTheSideAskedFor() throws {
-        let snapshot = try Fixtures.snapshot()
-        let placement = StackPlacement.resolve(snapshot.stacks[0], in: snapshot, placement: .right, room: .off)
-        #expect(placement == StackPlacement(side: .right, outside: false, meetsScreen: false))
+        let placement = StackPlacement.resolve(snapshot.stacks[0], in: snapshot, placement: .right)
+        #expect(placement == StackPlacement(side: .right, meetsScreen: false))
     }
 }
 
@@ -135,7 +117,7 @@ struct RoomTests {
     let base = Room(top: 0, bottom: 0, left: 0, right: 0, gap: 0)
 
     @Test func padsTheSideFacingTheScreen() throws {
-        let rooms = try Room.needed(Fixtures.snapshot(), placement: .edges, mode: .widenGap, depth: 30, base: base)
+        let rooms = try Room.needed(Fixtures.snapshot(), placement: .edges, depth: 30, base: base)
         #expect(rooms[3] == Room(left: 30))
         #expect(rooms[7] == Room(left: 30))
         #expect(rooms[13] == Room(left: 30))
@@ -143,22 +125,19 @@ struct RoomTests {
     }
 
     @Test func aStackFacingAWindowTurnsToTheScreen() throws {
-        let rooms = try Room.needed(Fixtures.snapshot(), placement: .right, mode: .widenGap, depth: 30, base: base)
+        let rooms = try Room.needed(Fixtures.snapshot(), placement: .right, depth: 30, base: base)
         #expect(rooms[3] == Room(left: 30))
         #expect(rooms[7] == Room(right: 30))
     }
 
-    @Test func boxedInTakesTheGapOnlyWhenAllowed() throws {
-        let snapshot = try StackPlacementTests().boxedIn()
-        let widen = Room.needed(snapshot, placement: .right, mode: .widenGap, depth: 30, base: base)
-        #expect(widen[3] == Room(gap: 30))
-        let padding = Room.needed(snapshot, placement: .right, mode: .paddingOnly, depth: 30, base: base)
-        #expect(padding[3] == nil)
+    @Test func boxedInWidensTheGap() throws {
+        let rooms = try Room.needed(StackPlacementTests().boxedIn(), placement: .right, depth: 30, base: base)
+        #expect(rooms[3] == Room(gap: 30))
     }
 
     @Test func neverLessThanYabaisOwn() throws {
         let generous = Room(top: 40, bottom: 40, left: 40, right: 40, gap: 12)
-        let rooms = try Room.needed(Fixtures.snapshot(), placement: .top, mode: .widenGap, depth: 30, base: generous)
+        let rooms = try Room.needed(Fixtures.snapshot(), placement: .top, depth: 30, base: generous)
         #expect(rooms[3] == generous)
     }
 
@@ -178,19 +157,19 @@ struct RoomKeeperTests {
         defer { fake.stop() }
         let keeper = RoomKeeper(yabai: Yabai(socket: YabaiSocket(path: fake.path)))
         var snapshot = try Fixtures.snapshot()
-        await keeper.update(snapshot, placement: .edges, mode: .widenGap, depth: 30)
+        await keeper.update(snapshot, placement: .edges, depth: 30)
         let commands = fake.messages.filter { $0.first == "space" }
         #expect(commands.contains(["space", "1", "--padding", "abs:0:0:30:0"]))
         #expect(commands.contains(["space", "1", "--gap", "abs:2"]))
         #expect(commands.count == 6)
 
         // Again: nothing changed, nothing sent.
-        await keeper.update(snapshot, placement: .edges, mode: .widenGap, depth: 30)
+        await keeper.update(snapshot, placement: .edges, depth: 30)
         #expect(fake.messages.count(where: { $0.first == "space" }) == 6)
 
         // Space 2's stack goes: it gets yabai's values back.
         snapshot.windows.removeAll { $0.space == 2 }
-        await keeper.update(snapshot, placement: .edges, mode: .widenGap, depth: 30)
+        await keeper.update(snapshot, placement: .edges, depth: 30)
         #expect(fake.messages.suffix(2) == [
             ["space", "2", "--padding", "abs:0:0:0:0"],
             ["space", "2", "--gap", "abs:2"],
@@ -203,22 +182,14 @@ struct RoomKeeperTests {
 }
 
 struct TabsTests {
-    @Test func outsideTheyShareTheWholeWidth() throws {
+    @Test func theyShareTheWholeWidth() throws {
         let stack = try Fixtures.snapshot().stacks[0]
-        let layout = IndicatorLayout(stack: stack, top: 102, side: .top, outside: true, style: .tabs)
+        let layout = IndicatorLayout(stack: stack, top: 102, side: .top, style: .tabs)
         #expect(layout.bounds == Frame(x: 8, y: 16, w: 852, h: 22))
         let widths = layout.items.map(\.frame.w)
         #expect(widths.allSatisfy { abs($0 - 848.0 / 3) < 0.01 })
         #expect(layout.items[2].frame.x + layout.items[2].frame.w == 852)
         #expect(layout.items.map(\.isTop) == [false, true, false])
-    }
-
-    @Test func insideTheyLeaveTheTitleBarButtons() throws {
-        let stack = try Fixtures.snapshot().stacks[0]
-        let layout = IndicatorLayout(stack: stack, top: nil, side: .top, outside: false, style: .tabs)
-        #expect(layout.bounds.x == 86)
-        #expect(layout.bounds.y == 44)
-        #expect(abs(layout.bounds.w - 771) < 0.01)
     }
 
     @Test func onlyTopOrBottom() {
@@ -236,19 +207,16 @@ struct TabsTests {
         above.frame = Frame(x: 8, y: -600, w: 852, h: 600)
         snapshot.windows.append(above)
         snapshot.spaces[0].windows.append(950)
-        let stack = snapshot.stacks[0]
-        let bottom = StackPlacement.resolve(stack, in: snapshot, placement: .top, room: .widenGap, style: .tabs)
-        #expect(bottom == StackPlacement(side: .bottom, outside: true, meetsScreen: true))
+        let bottom = StackPlacement.resolve(snapshot.stacks[0], in: snapshot, placement: .top, style: .tabs)
+        #expect(bottom == StackPlacement(side: .bottom, meetsScreen: true))
 
         var below = above
         below.id = 951
         below.frame = Frame(x: 8, y: 1200, w: 852, h: 300)
         snapshot.windows.append(below)
         snapshot.spaces[0].windows.append(951)
-        // Boxed in above and below; the open left side is no use to tabs.
-        let boxed = StackPlacement.resolve(
-            snapshot.stacks[0], in: snapshot, placement: .top, room: .paddingOnly, style: .tabs
-        )
-        #expect(boxed == StackPlacement(side: .top, outside: false, meetsScreen: false))
+        // Boxed in above and below; the open left side is no use to tabs, so the gap it is.
+        let boxed = StackPlacement.resolve(snapshot.stacks[0], in: snapshot, placement: .top, style: .tabs)
+        #expect(boxed == StackPlacement(side: .top, meetsScreen: false))
     }
 }

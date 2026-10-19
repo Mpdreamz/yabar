@@ -30,8 +30,6 @@ private struct SettingsView: View {
     @AppStorage(Preferences.Key.itemPerDisplay) private var itemPerDisplay = false
     @AppStorage(Preferences.Key.indicatorStyle) private var style = IndicatorStyle.icons.rawValue
     @AppStorage(Preferences.Key.indicatorPlacement) private var placement = IndicatorPlacement.edges.rawValue
-    @AppStorage(Preferences.Key.makeRoom) private var makeRoom = true
-    @AppStorage(Preferences.Key.widenGapWhenBoxedIn) private var widenGap = true
     @State private var launchAtLogin = LaunchAtLogin.isEnabled
     @State private var checkForUpdates = Updater.shared.checksAutomatically
     @State private var installUpdates = Updater.shared.installsAutomatically
@@ -64,10 +62,6 @@ private struct SettingsView: View {
                     Text("Bottom").tag(IndicatorPlacement.bottom.rawValue)
                 }
                 .disabled(style == IndicatorStyle.off.rawValue)
-                Toggle("Make room in yabai", isOn: $makeRoom)
-                    .disabled(style == IndicatorStyle.off.rawValue)
-                Toggle("Widen the gap for boxed-in stacks", isOn: $widenGap)
-                    .disabled(!makeRoom || style == IndicatorStyle.off.rawValue)
             } header: {
                 Text("Stack Indicators")
             } footer: {
@@ -107,10 +101,9 @@ private struct SettingsView: View {
     }
 
     private var roomExplanation: String {
-        guard makeRoom
-        else { return "Indicators are drawn inside their stacks; yabai's padding and gap are left alone." }
-        return "Indicators sit beside their stacks, in padding yabai leaves on spaces with stacks. A stack whose side "
-            + "faces another window turns to one facing the screen. Your .yabairc values come back when the last "
-            + "stack on a space goes, and when Yabar quits."
+        "Indicators sit beside their stacks, never over them, in padding yabai leaves on spaces with stacks. A stack "
+            + "whose side faces another window turns to one facing the screen; one with windows on every side gets a "
+            + "wider gap. Your .yabairc values come back when the last stack on a space goes, when indicators are "
+            + "off, and when Yabar quits."
     }
 }

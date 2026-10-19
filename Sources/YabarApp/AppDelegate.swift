@@ -7,7 +7,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let session = Session()
     private var spacesBar: SpacesBar?
     private var overlays: StackOverlays?
-    private lazy var room = RoomKeeper(yabai: session.yabai)
+    private lazy var room = RoomKeeper(yabai: session.yabai, leftover: Preferences.roomSpaces)
+    private var signalSources: [DispatchSourceSignal] = []
+    /// Quitting: nothing is redrawn or made room for any more.
+    private var terminating = false
     private let settings = SettingsWindow()
     private var drawnSettings = Preferences.signature
 
@@ -43,13 +46,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.settingsChanged() }
         }
+        quitOnSignals()
         session.start()
         drawSpaces()
     }
 
     func applicationShouldTerminate(_: NSApplication) -> NSApplication.TerminateReply {
+        guard !terminating else { return .terminateLater }
+        terminating = true
         Task {
             await room.restore(session.snapshot)
+            Preferences.roomSpaces = await room.changed
             await session.stop()
             NSApp.reply(toApplicationShouldTerminate: true)
         }
@@ -62,15 +69,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Has yabai leave room beside the stacks for their indicators, or take it back.
     private func makeRoom() {
-        guard let snapshot = session.snapshot else { return }
+        guard !terminating, let snapshot = session.snapshot else { return }
         let placement = Preferences.indicatorPlacement
-        let mode = Preferences.roomMode
         let depth = Preferences.roomDepth
         let style = Preferences.indicatorStyle
-        Task { await room.update(snapshot, placement: placement, mode: mode, depth: depth, style: style) }
+        Task {
+            await room.update(snapshot, placement: placement, depth: depth, style: style)
+            // Kept so a Yabar that is killed before it can put the room back has the next one do it.
+            let changed = await room.changed
+            if changed != Preferences.roomSpaces { Preferences.roomSpaces = changed }
+        }
+    }
+
+    /// `kill`, a logout or a terminal's Ctrl-C quit like the menu does, so yabai gets its padding and gap back. A
+    /// SIGKILL or a crash cannot; the spaces then wait for the next launch (`Preferences.roomSpaces`).
+    private func quitOnSignals() {
+        for signal in [SIGTERM, SIGINT, SIGHUP] {
+            Darwin.signal(signal, SIG_IGN)
+            let source = DispatchSource.makeSignalSource(signal: signal, queue: .main)
+            // Not terminate(nil) here: called from inside a main-queue block, its wait for the restore (which runs on
+            // the
+            // main actor) would never end. From the run loop, the main queue keeps being drained while it waits.
+            source.setEventHandler { NSApp.perform(#selector(NSApplication.terminate(_:)), with: nil, afterDelay: 0) }
+            source.resume()
+            signalSources.append(source)
+        }
     }
 
     private func settingsChanged() {
+        guard !terminating else { return }
         let signature = Preferences.signature
         guard signature != drawnSettings else { return }
         drawnSettings = signature
@@ -162,14 +189,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             entry.indentationLevel = 1
             submenu.addItem(entry)
         }
-        submenu.addItem(.separator())
-        submenu.addItem(toggle("Make Room in yabai", on: Preferences.makeRoom, action: #selector(toggleMakeRoom)))
-        let boxedIn = toggle(
-            "Widen the Gap for Boxed-In Stacks", on: Preferences.widenGapWhenBoxedIn, action: #selector(toggleBoxedIn)
-        )
-        boxedIn.indentationLevel = 1
-        boxedIn.isEnabled = Preferences.makeRoom
-        submenu.addItem(boxedIn)
         item.submenu = submenu
         return item
     }
@@ -184,14 +203,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let raw = item.representedObject as? String,
               let placement = IndicatorPlacement(rawValue: raw) else { return }
         Preferences.indicatorPlacement = placement
-    }
-
-    @objc private func toggleBoxedIn() {
-        Preferences.widenGapWhenBoxedIn.toggle()
-    }
-
-    @objc private func toggleMakeRoom() {
-        Preferences.makeRoom.toggle()
     }
 
     private func icon(for pid: Int32) -> NSImage? {

@@ -13,8 +13,8 @@ enum Preferences {
         static let itemPerDisplay = "itemPerDisplay"
         static let indicatorStyle = "indicatorStyle"
         static let indicatorPlacement = "indicatorPlacement"
-        static let makeRoom = "makeRoom"
-        static let widenGapWhenBoxedIn = "widenGapWhenBoxedIn"
+        /// Spaces whose padding or gap Yabar changed and has not put back yet (space ids).
+        static let roomSpaces = "roomSpaces"
     }
 
     /// A space's label instead of its index, when it has one.
@@ -44,26 +44,24 @@ enum Preferences {
         set { defaults.set(newValue.rawValue, forKey: Key.indicatorPlacement) }
     }
 
-    /// Have yabai leave room beside each stack for its indicators (padding and gap on spaces with stacks).
-    static var makeRoom: Bool {
-        get { defaults.object(forKey: Key.makeRoom) as? Bool ?? true }
-        set { defaults.set(newValue, forKey: Key.makeRoom) }
+    /// How much room yabai is to leave beside each stack, or nil when indicators are off.
+    static var roomDepth: Double? {
+        indicatorStyle == .off ? nil : IndicatorMetrics().room(indicatorStyle)
     }
 
-    /// A stack boxed in by other windows on every side: widen the space's gap for it (true), or draw its indicators
-    /// inside it (false). Either way a stack that meets the screen somewhere gets padding on that side.
-    static var widenGapWhenBoxedIn: Bool {
-        get { defaults.object(forKey: Key.widenGapWhenBoxedIn) as? Bool ?? true }
-        set { defaults.set(newValue, forKey: Key.widenGapWhenBoxedIn) }
-    }
-
-    static var roomMode: RoomMode {
-        guard makeRoom, indicatorStyle != .off else { return .off }
-        return widenGapWhenBoxedIn ? .widenGap : .paddingOnly
-    }
-
-    static var roomDepth: Double {
-        IndicatorMetrics().room(indicatorStyle)
+    /// Spaces an earlier run changed and may not have put back (it was killed, or crashed).
+    static var roomSpaces: Set<UInt64> {
+        get {
+            let stored = defaults.array(forKey: Key.roomSpaces) as? [NSNumber] ?? []
+            return Set(stored.map(\.uint64Value))
+        }
+        set {
+            if newValue.isEmpty {
+                defaults.removeObject(forKey: Key.roomSpaces)
+            } else {
+                defaults.set(newValue.sorted().map { NSNumber(value: $0) }, forKey: Key.roomSpaces)
+            }
+        }
     }
 
     static var menuBarOptions: MenuBarOptions {
@@ -74,7 +72,7 @@ enum Preferences {
     static var signature: String {
         [
             "\(showLabels)", "\(hideEmptySpaces)", "\(itemPerDisplay)", indicatorStyle.rawValue,
-            indicatorPlacement.rawValue, "\(makeRoom)", "\(widenGapWhenBoxedIn)",
+            indicatorPlacement.rawValue,
         ].joined(separator: "|")
     }
 }

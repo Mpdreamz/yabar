@@ -1,6 +1,7 @@
-/// Where a stack's indicators go, stackline style: one per window, in stack order, along one side of the stack
-/// (`StackPlacement` picks it). With room made for them (`Room`), they sit just outside the stack's frame, in the
-/// padding or the gap yabai leaves there; without, just inside it. Everything is in yabai's coordinates.
+/// Where a stack's indicators go: one per window, in stack order, along one side of the stack (`StackPlacement` picks
+/// it), just outside the stack's frame, in the padding or the gap yabai leaves there (`Room`). Never over the window:
+/// apps draw their own title bars and toolbars, and nothing can know where those are. Everything is in yabai's
+/// coordinates.
 public enum IndicatorStyle: String, CaseIterable, Sendable {
     /// The app's icon on a rounded tile.
     case icons
@@ -58,7 +59,7 @@ public struct IndicatorMetrics: Equatable, Sendable {
     public var pill: Double = 5
     /// A tab's height.
     public var tab: Double = 22
-    /// Between an indicator and the stack's edge (and the far side of the strip).
+    /// Between an indicator and the stack's edge (and the far side of the strip), and before the first one.
     public var margin: Double = 3
     public var spacing: Double = 6
 
@@ -93,55 +94,37 @@ public struct IndicatorLayout: Equatable, Sendable {
     public var side: Side
     public var items: [Item]
 
-    /// Inside a stack, the room left for the title bar's buttons before the first indicator.
-    public static let titleBarClearance = (down: 36.0, across: 78.0)
-
-    public init(
-        stack: Stack, top: Int?, side: Side, outside: Bool, style: IndicatorStyle, metrics: IndicatorMetrics = .init()
-    ) {
+    public init(stack: Stack, top: Int?, side: Side, style: IndicatorStyle, metrics: IndicatorMetrics = .init()) {
         let frame = stack.frame
         self.side = side
         let depth = metrics.depth(style)
         let count = Double(stack.windows.count)
 
-        // Along the side: where the row starts and how much of the side it may use.
-        var start: Double
-        let length: Double
-        if side.isVertical {
-            start = outside ? metrics.margin : IndicatorLayout.titleBarClearance.down
-            length = frame.h
-        } else {
-            start = outside ? metrics.margin : IndicatorLayout.titleBarClearance.across
-            length = frame.w
-        }
-        var available = max(length - start - metrics.margin, depth)
+        // Along the side: tabs share all of it edge to edge; icons and pills start a margin in, and shrink to fit a
+        // stack too short for them rather than run past its end.
+        let length = side.isVertical ? frame.h : frame.w
+        var start = metrics.margin
         var extent = metrics.size
         var spacing = metrics.spacing
         if style == .tabs {
-            // Tabs share the side between them, edge to edge when outside the stack.
-            if outside {
-                start = 0
-                available = length
+            start = 0
+            spacing = 2
+            extent = max(4, (length - (count - 1) * spacing) / count)
+        } else {
+            let available = max(length - start * 2, depth)
+            if count * (extent + spacing) - spacing > available {
+                extent = max(4, (available - (count - 1) * 2) / count)
+                spacing = 2
             }
-            spacing = 2
-            extent = max(4, (available - (count - 1) * spacing) / count)
-        } else if count * (extent + spacing) - spacing > available {
-            // Shrink to fit a tall stack in a short side rather than run past its end.
-            extent = max(4, (available - (count - 1) * 2) / count)
-            spacing = 2
         }
         let run = count * (extent + spacing) - spacing
 
-        // Across the side: just outside the frame, or just inside it.
-        let across: Double = switch (side, outside) {
-        case (.left, true): frame.x - metrics.margin - depth
-        case (.left, false): frame.x + metrics.margin
-        case (.right, true): frame.x + frame.w + metrics.margin
-        case (.right, false): frame.x + frame.w - metrics.margin - depth
-        case (.top, true): frame.y - metrics.margin - depth
-        case (.top, false): frame.y + metrics.margin
-        case (.bottom, true): frame.y + frame.h + metrics.margin
-        case (.bottom, false): frame.y + frame.h - metrics.margin - depth
+        // Across the side: just outside the frame.
+        let across: Double = switch side {
+        case .left: frame.x - metrics.margin - depth
+        case .right: frame.x + frame.w + metrics.margin
+        case .top: frame.y - metrics.margin - depth
+        case .bottom: frame.y + frame.h + metrics.margin
         }
         let vertical = side.isVertical
         bounds = vertical
