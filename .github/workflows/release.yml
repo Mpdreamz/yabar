@@ -167,8 +167,9 @@ jobs:
               | "$openssl" pkey -inform DER -pubout -outform DER | tail -c 32 | base64)"
           fi
           rm -f "$raw"
-          echo "appcast: public key derived (${#derived} characters)"
+          echo "appcast: public key derived from the secret: $derived"
           trusted="$(plutil -extract SUPublicEDKey raw build/Yabar.app/Contents/Info.plist)"
+          echo "appcast: public key in Info.plist: $trusted"
           [ -n "$derived" ] && [ "$derived" = "$trusted" ] \
             || { echo "SPARKLE_PRIVATE_KEY does not match SUPublicEDKey ($trusted) in Info.plist" >&2; exit 1; }
           signature="$("$tools/bin/sign_update" --ed-key-file - -p dist/Yabar-arm64.zip <<<"$SPARKLE_PRIVATE_KEY")"
