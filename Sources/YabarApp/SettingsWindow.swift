@@ -26,6 +26,7 @@ final class SettingsWindow {
 
 private struct SettingsView: View {
     @AppStorage(Preferences.Key.showLabels) private var showLabels = true
+    @AppStorage(Preferences.Key.showAttention) private var showAttention = true
     @AppStorage(Preferences.Key.hideEmptySpaces) private var hideEmptySpaces = false
     @AppStorage(Preferences.Key.itemPerDisplay) private var itemPerDisplay = false
     @AppStorage(Preferences.Key.indicatorStyle) private var style = IndicatorStyle.icons.rawValue
@@ -44,6 +45,18 @@ private struct SettingsView: View {
                 Toggle("Show space labels", isOn: $showLabels)
                 Toggle("Hide empty spaces", isOn: $hideEmptySpaces)
                 Toggle("One item per display", isOn: $itemPerDisplay)
+            }
+            Section {
+                Toggle("Mark windows that want attention", isOn: $showAttention)
+            } header: {
+                Text("Attention")
+            } footer: {
+                Text(
+                    "A window whose title starts with 🔔 (a terminal's bell, in Ghostty) or a count like (3) gets a red "
+                        + "badge on its indicator, and its space a bar in the menu bar. `yabar focus attention` goes to the "
+                        + "next one."
+                )
+                .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
             }
             Section {
                 Picker("Style", selection: $style) {

@@ -9,6 +9,7 @@ enum Preferences {
 
     enum Key {
         static let showLabels = "showLabels"
+        static let showAttention = "showAttention"
         static let hideEmptySpaces = "hideEmptySpaces"
         static let itemPerDisplay = "itemPerDisplay"
         static let indicatorStyle = "indicatorStyle"
@@ -21,6 +22,12 @@ enum Preferences {
     static var showLabels: Bool {
         get { defaults.object(forKey: Key.showLabels) as? Bool ?? true }
         set { defaults.set(newValue, forKey: Key.showLabels) }
+    }
+
+    /// Mark windows (and their spaces) whose title says they want attention.
+    static var showAttention: Bool {
+        get { defaults.object(forKey: Key.showAttention) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Key.showAttention) }
     }
 
     static var hideEmptySpaces: Bool {
@@ -65,13 +72,13 @@ enum Preferences {
     }
 
     static var menuBarOptions: MenuBarOptions {
-        MenuBarOptions(hideEmpty: hideEmptySpaces, showLabels: showLabels)
+        MenuBarOptions(hideEmpty: hideEmptySpaces, showLabels: showLabels, showAttention: showAttention)
     }
 
     /// Everything that changes what is drawn, to tell a change worth redrawing for from any other default being set.
     static var signature: String {
         [
-            "\(showLabels)", "\(hideEmptySpaces)", "\(itemPerDisplay)", indicatorStyle.rawValue,
+            "\(showLabels)", "\(showAttention)", "\(hideEmptySpaces)", "\(itemPerDisplay)", indicatorStyle.rawValue,
             indicatorPlacement.rawValue,
         ].joined(separator: "|")
     }

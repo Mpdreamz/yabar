@@ -8,6 +8,7 @@ import YabarCore
 let usage = """
 usage: yabar focus <west|east|north|south>  [--axis horizontal|vertical]
        yabar focus <next|prev>
+       yabar focus attention
        yabar --version
 
   focus west|east|north|south
@@ -18,6 +19,9 @@ usage: yabar focus <west|east|north|south>  [--axis horizontal|vertical]
   focus next|prev
       The next (previous) window of the space: every tile in yabai's order, every window of a stack in stack order,
       wrapping round.
+  focus attention
+      The next window, on any space, whose title says it wants attention: it starts with 🔔 (a terminal's bell, in
+      Ghostty) or a count like (3). Fails when there is none.
 
   skhd, for example:
       lcmd - h : yabar focus west
@@ -133,8 +137,14 @@ let steps: [Navigator.Step]
 switch args[1] {
 case "next": steps = Navigator.cycle(forward: true, in: snapshot)
 case "prev": steps = Navigator.cycle(forward: false, in: snapshot)
+case "attention":
+    let focused = snapshot.windows.first(where: \.hasFocus)?.id
+    steps = snapshot.windowsNeedingAttention(after: focused).prefix(1).map { .window($0) }
 default:
-    guard let direction = Direction(rawValue: args[1]) else { fail("focus takes a direction, next or prev", code: 2) }
+    guard let direction = Direction(rawValue: args[1]) else { fail(
+        "focus takes a direction, next, prev or attention",
+        code: 2
+    ) }
     steps = Navigator.plan(direction, in: snapshot, axis: axisResolver(override: axis, snapshot: snapshot))
 }
 await exit(run(steps, yabai: yabai, memory: memory) ? 0 : 1)

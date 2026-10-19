@@ -18,7 +18,10 @@ public struct Changes: Equatable, Sendable {
     }
 
     public init(from old: Snapshot?, to new: Snapshot) {
-        spaces = old.map { $0.displays != new.displays || $0.spaces != new.spaces } ?? true
+        spaces = old.map {
+            $0.displays != new.displays || $0.spaces != new.spaces
+                || $0.spacesNeedingAttention != new.spacesNeedingAttention
+        } ?? true
         let before = Dictionary(uniqueKeysWithValues: (old?.stacks ?? []).map { ($0.id, $0) })
         let after = new.stacks
         let afterIDs = Set(after.map(\.id))
