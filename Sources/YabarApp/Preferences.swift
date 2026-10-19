@@ -14,6 +14,7 @@ enum Preferences {
         static let itemPerDisplay = "itemPerDisplay"
         static let indicatorStyle = "indicatorStyle"
         static let indicatorPlacement = "indicatorPlacement"
+        static let spaceLabels = "spaceLabels"
         /// Spaces whose padding or gap Yabar changed and has not put back yet (space ids).
         static let roomSpaces = "roomSpaces"
     }
@@ -54,6 +55,15 @@ enum Preferences {
     /// How much room yabai is to leave beside each stack, or nil when indicators are off.
     static var roomDepth: Double? {
         indicatorStyle == .off ? nil : IndicatorMetrics().room(indicatorStyle)
+    }
+
+    /// Space labels, kept so they can be put back when yabai forgets them (`SpaceLabels`).
+    static var spaceLabels: SpaceLabels {
+        get {
+            defaults.data(forKey: Key.spaceLabels).flatMap { try? JSONDecoder().decode(SpaceLabels.self, from: $0) }
+                ?? SpaceLabels()
+        }
+        set { defaults.set(try? JSONEncoder().encode(newValue), forKey: Key.spaceLabels) }
     }
 
     /// Spaces an earlier run changed and may not have put back (it was killed, or crashed).

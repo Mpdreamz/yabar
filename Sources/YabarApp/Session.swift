@@ -62,20 +62,17 @@ final class Session {
         }
     }
 
-    /// yabai going away or restarting sends no signal: every few seconds, ask whether Yabar's signals are still there.
-    /// Gone means yabai restarted (add them again and look); no answer means it stopped.
+    /// yabai going away or restarting sends no signal, and neither do some changes (a space's label): every few
+    /// seconds, ask whether Yabar's signals are still there, and look again. Gone means yabai restarted (add them
+    /// again); no answer means it stopped.
     private func check() {
         guard error == nil else { return }
         Task { [yabai, refresher, weak self] in
-            do {
-                if try await !yabai.hasSignals() {
-                    self?.onRestart?()
-                    await self?.addSignals()
-                    await refresher.poke()
-                }
-            } catch {
-                await refresher.poke()
+            if let present = try? await yabai.hasSignals(), !present {
+                self?.onRestart?()
+                await self?.addSignals()
             }
+            await refresher.poke()
         }
     }
 
@@ -91,6 +88,11 @@ final class Session {
     /// What to draw in the menu bar: yabai's snapshot, or the window server's spaces while yabai is not running.
     var spaces: Snapshot? {
         snapshot ?? (error != nil ? NativeSpacesSource.snapshot() : nil)
+    }
+
+    /// Look again now (after a command that sends no signal, such as a label).
+    func refresh() {
+        Task { [refresher] in await refresher.poke() }
     }
 
     func focus(window id: Int) {
