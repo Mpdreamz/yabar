@@ -10,10 +10,12 @@ public struct SpaceSettings: Codable, Equatable, Sendable {
     public var gap: Double?
     /// The stack indicators on this display or space, instead of the one chosen in Settings.
     public var indicatorStyle: IndicatorStyle?
+    /// At most this many tiles: a new window beyond it goes into a stack (`AutoStack`).
+    public var maxTiles: Int?
 
     public init(
         layout: Space.Layout? = nil, top: Double? = nil, bottom: Double? = nil, left: Double? = nil,
-        right: Double? = nil, gap: Double? = nil, indicatorStyle: IndicatorStyle? = nil
+        right: Double? = nil, gap: Double? = nil, indicatorStyle: IndicatorStyle? = nil, maxTiles: Int? = nil
     ) {
         self.layout = layout
         self.top = top
@@ -22,6 +24,7 @@ public struct SpaceSettings: Codable, Equatable, Sendable {
         self.right = right
         self.gap = gap
         self.indicatorStyle = indicatorStyle
+        self.maxTiles = maxTiles
     }
 
     public var isEmpty: Bool {
@@ -33,7 +36,7 @@ public struct SpaceSettings: Codable, Equatable, Sendable {
         SpaceSettings(
             layout: layout ?? broader.layout, top: top ?? broader.top, bottom: bottom ?? broader.bottom,
             left: left ?? broader.left, right: right ?? broader.right, gap: gap ?? broader.gap,
-            indicatorStyle: indicatorStyle ?? broader.indicatorStyle
+            indicatorStyle: indicatorStyle ?? broader.indicatorStyle, maxTiles: maxTiles ?? broader.maxTiles
         )
     }
 }

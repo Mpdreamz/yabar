@@ -92,6 +92,7 @@ struct ProfilesSection: View {
                 }
             }
             LabeledContent("Gap") { number("gap", \.gap) }
+            LabeledContent("Max tiles") { count("none", \.maxTiles) }
             Picker("Stack indicators", selection: style) {
                 Text("Inherit").tag(IndicatorStyle?.none)
                 Text("Icons").tag(IndicatorStyle?.some(.icons))
@@ -104,7 +105,8 @@ struct ProfilesSection: View {
         } footer: {
             Text("Settings for a display kind, one display, or a labelled space, from broad to specific; anything left "
                 + "empty (inherit) comes from the broader one, and in the end from .yabairc. Room for stack indicators is added "
-                + "on top. Everything goes back to .yabairc's values when Yabar quits.")
+                +
+                "on top. With max tiles, a new window beyond it goes into a stack on the focused tile. Everything goes back to .yabairc's values when Yabar quits.")
                 .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -127,6 +129,21 @@ struct ProfilesSection: View {
 
     private var style: Binding<IndicatorStyle?> {
         Binding(get: { profiles[scope].indicatorStyle }, set: { profiles[scope].indicatorStyle = $0 })
+    }
+
+    /// A whole number of at least 1 that may be left empty, to inherit.
+    private func count(_ placeholder: String, _ path: WritableKeyPath<SpaceSettings, Int?>) -> some View {
+        TextField("", text: Binding(
+            get: { profiles[scope][keyPath: path].map(String.init) ?? "" },
+            set: { text in
+                let trimmed = text.trimmingCharacters(in: .whitespaces)
+                profiles[scope][keyPath: path] = trimmed.isEmpty ? nil : Int(trimmed).map { max(1, $0) }
+            }
+        ), prompt: Text(placeholder))
+            .labelsHidden()
+            .textFieldStyle(.roundedBorder)
+            .frame(width: 64)
+            .multilineTextAlignment(.trailing)
     }
 
     /// A number that may be left empty, to inherit.

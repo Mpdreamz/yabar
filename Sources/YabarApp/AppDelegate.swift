@@ -34,6 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             overlays?.apply(changes, in: session.snapshot)
             if !changes.added.isEmpty || !changes.removed.isEmpty || changes.spaces { makeRoom() }
         }
+        session.onSnapshot = { [weak self] old, new in self?.autoStack(from: old, to: new) }
         session.onRestart = { [weak self] in
             guard let self else { return }
             Task { await keeper.forget() }
@@ -87,6 +88,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             session.refresh()
         }
+    }
+
+    /// A new window on a space already at its profile's maximum of tiles goes into a stack (`AutoStack`).
+    private func autoStack(from old: Snapshot, to new: Snapshot) {
+        guard !terminating else { return }
+        let plan = Preferences.plan(for: new)
+        let commands = AutoStack.commands(from: old, to: new) { plan.settings(for: $0, in: new).maxTiles }
+        if !commands.isEmpty { run(commands) }
     }
 
     /// Keeps every space at its profile's layout, padding and gap, with room beside its stacks for their indicators.
