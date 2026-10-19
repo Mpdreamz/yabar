@@ -10,17 +10,33 @@ public struct Yabai: Sendable {
     }
 
     /// Displays, spaces and windows, asked for at once.
+    ///
+    /// A window's `has-focus` can lag: after focus moves by direction between two windows of one app, yabai still marks
+    /// the old one while `query --windows --window` already names the new one. That answer is taken as the truth.
     public func snapshot() async throws(YabaiError) -> Snapshot {
         do {
             async let displays = query([Display].self, "--displays", Display.queryProperties)
             async let spaces = query([Space].self, "--spaces", Space.queryProperties)
             async let windows = query([Window].self, "--windows", Window.queryProperties)
-            return try await Snapshot(displays: displays, spaces: spaces, windows: windows)
+            async let focused = focusedWindowID()
+            var snapshot = try await Snapshot(displays: displays, spaces: spaces, windows: windows)
+            let id = await focused
+            for index in snapshot.windows.indices {
+                snapshot.windows[index].hasFocus = snapshot.windows[index].id == id
+            }
+            return snapshot
         } catch let error as YabaiError {
             throw error
         } catch {
             throw .io(String(describing: error))
         }
+    }
+
+    /// The focused window's id, or nil when there is none (a space without windows) or yabai does not answer.
+    private func focusedWindowID() async -> Int? {
+        struct Focused: Decodable { let id: Int }
+        guard let data = try? await socket.send(["query", "--windows", "id", "--window"]) else { return nil }
+        return (try? JSONDecoder().decode(Focused.self, from: data))?.id
     }
 
     private func query<T: Decodable>(_: T.Type, _ domain: String, _ properties: String) async throws -> T {
