@@ -17,6 +17,11 @@ enum Preferences {
         set { defaults.set(newValue, forKey: "itemPerDisplay") }
     }
 
+    static var indicatorStyle: IndicatorStyle {
+        get { defaults.string(forKey: "indicatorStyle").flatMap(IndicatorStyle.init(rawValue:)) ?? .icons }
+        set { defaults.set(newValue.rawValue, forKey: "indicatorStyle") }
+    }
+
     static var menuBarOptions: MenuBarOptions {
         MenuBarOptions(hideEmpty: hideEmptySpaces)
     }

@@ -25,8 +25,18 @@ public enum Signals {
     public static func add(_ event: String, listener path: String) -> [String] {
         // yabai sets YABAI_WINDOW_ID for window events only; the others send an empty id.
         let action = "echo \"\(event) $YABAI_WINDOW_ID\" | nc -U \(shellQuoted(path)) >/dev/null 2>&1"
-        return ["signal", "--add", "event=\(event)", "label=\(labelPrefix)\(event)", "action=\(action)"]
+        var args = ["signal", "--add", "event=\(event)", "label=\(labelPrefix)\(event)", "action=\(action)"]
+        // Yabar's own overlays coming and going are not news.
+        if event.hasPrefix("window_") || event.hasPrefix("application_") { args.append("app!=\(ownApp)") }
+        return args
     }
+
+    /// Matches Yabar's own process name, for yabai's app filters.
+    public static let ownApp = "^Yabar$"
+
+    /// A rule that keeps yabai from tiling Yabar's overlays, should it ever see one as a window to manage.
+    public static let addRule = ["rule", "--add", "label=\(labelPrefix)overlays", "app=\(ownApp)", "manage=off"]
+    public static let removeRule = ["rule", "--remove", "\(labelPrefix)overlays"]
 
     public static func remove(_ event: String) -> [String] {
         ["signal", "--remove", "\(labelPrefix)\(event)"]

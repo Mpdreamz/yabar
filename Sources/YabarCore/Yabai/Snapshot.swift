@@ -95,9 +95,10 @@ public struct Stack: Equatable, Sendable, Identifiable {
         windows[0].frame
     }
 
-    /// The window on top: the one yabai shows.
-    public var top: Window? {
-        windows.first(where: \.isVisible)
+    /// The window on top, as far as the snapshot alone can tell: the focused one. yabai reports every window of a
+    /// stack as visible, so with focus elsewhere it takes `StackTops`, which remembers.
+    public var focused: Window? {
+        windows.first(where: \.hasFocus)
     }
 
     /// Whether keyboard focus is in this stack.

@@ -20,8 +20,10 @@
 - **Socket.** `/tmp/yabai_$USER.socket`, one stream connection per command. Request: an `int32` length (native byte
   order), each argument after `-m` NUL-terminated, then one more NUL; `shutdown(SHUT_WR)`, read to EOF. A reply
   starting with `0x07` is an error. Queries take a property list: `query --windows id,frame,stack-index --space`.
-- **Stacks.** `stack-index` is 0 outside a stack, 1… inside; a stack's windows share one frame and only the top one
-  is `is-visible`. Windows yabai has no AX reference for (spaces not visited since it started) always report 0.
+- **Stacks.** `stack-index` is 0 outside a stack, 1… inside; a stack's windows share one frame. Every window of a
+  stack reports `is-visible`, so which one is on top is not in the query: Yabar takes the focused one, then the last
+  one focused, then the window server's front-to-back order (`StackTops`). Windows yabai has no AX reference for
+  (spaces not visited since it started) always report 0, and a yabai restart forgets every stack.
 - **Signals** run a shell command; there is no push to an app and no "stack changed" event. Yabar registers labelled
   signals for `window_created/destroyed/focused/moved/resized/minimized/deminimized/title_changed`,
   `space_changed/created/destroyed`, `display_*`, `application_front_switched/hidden/visible` and `dock_did_restart`,
@@ -33,4 +35,5 @@
 
 Non-activating borderless panels, one per stack, that handle their own clicks (no global event tap). Each is moved
 onto its stack's space with SkyLight's `SLSMoveWindowsToManagedSpace` so it travels with the space instead of being
-re-shown on every switch. Titles come from yabai and icons from `NSRunningApplication`, so no permission is needed.
+re-shown on every switch. The move only holds once the window server has ordered the panel in (a move before that is
+undone), and an existing panel is never ordered in again, which would pull it to the space on screen. Titles come from yabai and icons from `NSRunningApplication`, so no permission is needed.

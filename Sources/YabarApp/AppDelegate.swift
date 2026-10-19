@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let build = BuildInfo(info: Bundle.main.infoDictionary ?? [:])
     private let session = Session()
     private var spacesBar: SpacesBar?
+    private var overlays: StackOverlays?
 
     func applicationDidFinishLaunching(_: Notification) {
         Updater.shared.start()
@@ -13,8 +14,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menu: { [unowned self] in makeMenu() },
             focusSpace: { [unowned self] in session.focus(space: $0) }
         )
+        overlays = StackOverlays { [unowned self] in session.focus(window: $0) }
         session.onChange = { [weak self] changes in
-            if changes.spaces { self?.drawSpaces() }
+            guard let self else { return }
+            if changes.spaces { drawSpaces() }
+            overlays?.apply(changes, in: session.snapshot)
+        }
+        // A display added, removed or rearranged moves every stack's screen position.
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.overlays?.redraw(self?.session.snapshot) }
         }
         session.start()
         drawSpaces()
@@ -42,6 +52,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menu.addItem(disabled(yabaiStatus))
         }
         menu.addItem(.separator())
+        menu.addItem(indicatorMenu())
         menu.addItem(toggle("Hide Empty Spaces", on: Preferences.hideEmptySpaces, action: #selector(toggleHideEmpty)))
         menu.addItem(toggle(
             "One Item per Display", on: Preferences.itemPerDisplay, action: #selector(toggleItemPerDisplay)
@@ -84,6 +95,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 menu.addItem(entry)
             }
         }
+    }
+
+    private func indicatorMenu() -> NSMenuItem {
+        let item = NSMenuItem(title: "Stack Indicators", action: nil, keyEquivalent: "")
+        let styles = NSMenu()
+        for (style, title) in [(IndicatorStyle.icons, "Icons"), (.pills, "Pills"), (.off, "Off")] {
+            let entry = NSMenuItem(title: title, action: #selector(chooseIndicatorStyle(_:)), keyEquivalent: "")
+            entry.target = self
+            entry.representedObject = style.rawValue
+            entry.state = Preferences.indicatorStyle == style ? .on : .off
+            styles.addItem(entry)
+        }
+        item.submenu = styles
+        return item
+    }
+
+    @objc private func chooseIndicatorStyle(_ item: NSMenuItem) {
+        guard let raw = item.representedObject as? String, let style = IndicatorStyle(rawValue: raw) else { return }
+        Preferences.indicatorStyle = style
+        overlays?.redraw(session.snapshot)
     }
 
     private func icon(for pid: Int32) -> NSImage? {
