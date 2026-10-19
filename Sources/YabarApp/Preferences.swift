@@ -33,10 +33,20 @@ enum Preferences {
         set { defaults.set(newValue, forKey: "makeRoom") }
     }
 
-    /// How deep the room for indicators is, or nil when none is to be made.
-    static var roomDepth: Double? {
-        guard makeRoom, indicatorStyle != .off else { return nil }
-        return IndicatorMetrics().room(indicatorStyle)
+    /// A stack boxed in by other windows on every side: widen the space's gap for it (true), or draw its indicators
+    /// inside it (false). Either way a stack that meets the screen somewhere gets padding on that side.
+    static var widenGapWhenBoxedIn: Bool {
+        get { defaults.object(forKey: "widenGapWhenBoxedIn") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "widenGapWhenBoxedIn") }
+    }
+
+    static var roomMode: RoomMode {
+        guard makeRoom, indicatorStyle != .off else { return .off }
+        return widenGapWhenBoxedIn ? .widenGap : .paddingOnly
+    }
+
+    static var roomDepth: Double {
+        IndicatorMetrics().room(indicatorStyle)
     }
 
     static var menuBarOptions: MenuBarOptions {

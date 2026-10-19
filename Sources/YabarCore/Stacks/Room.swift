@@ -28,24 +28,21 @@ public struct Room: Equatable, Sendable {
         ]
     }
 
-    /// What each space with stacks needs, starting from `base` (yabai's configured padding and gap), keyed by space id.
-    /// A side is padded when a stack's indicators face the screen there, and the gap widened when they face another
-    /// window. Whether a stack meets the screen is read from its neighbours, not its distance to the edge, so the
-    /// answer does not change once the padding moves it.
+    /// What each space with stacks needs, starting from `base` (yabai's configured padding and gap), keyed by space id:
+    /// padding on the side a stack's indicators take where it meets the screen, a wider gap where they face another
+    /// window (`StackPlacement` decides which). Whether a stack meets the screen is read from its neighbours, not its
+    /// distance to the edge, so the answer does not change once the padding moves it.
     public static func needed(
-        _ snapshot: Snapshot, placement: IndicatorPlacement, depth: Double, base: Room
+        _ snapshot: Snapshot, placement: IndicatorPlacement, mode: RoomMode, depth: Double, base: Room
     ) -> [UInt64: Room] {
         var rooms: [UInt64: Room] = [:]
         for stack in snapshot.stacks {
             guard let space = snapshot.space(index: stack.spaceIndex) else { continue }
-            let display = snapshot.displays.first { $0.index == space.display }?.frame
-            let side = Side(placement, frame: stack.frame, display: display)
+            let resolved = StackPlacement.resolve(stack, in: snapshot, placement: placement, room: mode)
+            guard resolved.outside else { continue }
             var room = rooms[space.id] ?? base
-            let others = snapshot.windows(onSpace: space.index).filter { window in
-                !window.isFloating && !stack.windows.contains { $0.id == window.id }
-            }
-            if meetsScreen(stack.frame, side: side, others: others.map(\.frame)) {
-                switch side {
+            if resolved.meetsScreen {
+                switch resolved.side {
                 case .left: room.left = max(room.left, depth)
                 case .right: room.right = max(room.right, depth)
                 case .top: room.top = max(room.top, depth)
