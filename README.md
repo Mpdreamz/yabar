@@ -31,3 +31,10 @@ space a bar under it in the menu bar. Ghostty puts 🔔 in a terminal's title wh
 so an agent or a long command that rings it when done shows up wherever it is. Turn it off in Settings.
 
 It talks to yabai's socket directly: no Yabar.app needed, no permissions, a few milliseconds per key.
+
+## Displays, spaces and auto-stack
+
+Settings → Displays & Spaces sets a layout, padding, gap, stack indicator style and a maximum number of tiles for
+built-in displays, external displays, one display, or one labelled space (Label This Space… in the menu). With a
+maximum, a new window that would make one tile too many goes into a stack on the tile that had focus. Yabar keeps all
+of this as per-space settings in yabai and puts .yabairc's values back when it quits.

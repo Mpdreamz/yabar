@@ -21,6 +21,8 @@ final class Session {
     var onChange: ((Changes) -> Void)?
     /// yabai restarted (or came back): whatever Yabar set in it is gone.
     var onRestart: (() -> Void)?
+    /// Every new snapshot with the one before it, to act on what appeared in between (`AutoStack`).
+    var onSnapshot: ((_ old: Snapshot, _ new: Snapshot) -> Void)?
 
     init() {
         let yabai = yabai
@@ -146,7 +148,9 @@ final class Session {
             retry?.invalidate()
             retry = nil
             let changes = Changes(from: snapshot, to: new)
+            let old = snapshot
             snapshot = new
+            if let old, !cameBack { onSnapshot?(old, new) }
             if cameBack {
                 onRestart?()
                 Task { await addSignals() }
