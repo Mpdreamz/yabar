@@ -133,7 +133,8 @@ struct SignalTests {
 struct SocketTests {
     @Test func snapshotOverTheSocket() async throws {
         let fake = try FakeYabai { args in
-            switch args.prefix(2) {
+            if args == ["query", "--windows", "id", "--window"] { return Data("{\"id\":102}".utf8) }
+            return switch args.prefix(2) {
             case ["query", "--displays"]: Data(Fixtures.displays.utf8)
             case ["query", "--spaces"]: Data(Fixtures.spaces.utf8)
             case ["query", "--windows"]: Data(Fixtures.windows.utf8)
@@ -149,6 +150,22 @@ struct SocketTests {
         await #expect(throws: YabaiError.failed("unknown command")) {
             try await yabai.focus(window: 1)
         }
+    }
+
+    /// After focus moves by direction between two windows of one app, yabai's `has-focus` still marks the old one.
+    @Test func focusComesFromTheFocusedWindowQuery() async throws {
+        let fake = try FakeYabai { args in
+            if args == ["query", "--windows", "id", "--window"] { return Data("{\"id\":104}".utf8) }
+            return switch args.prefix(2) {
+            case ["query", "--displays"]: Data(Fixtures.displays.utf8)
+            case ["query", "--spaces"]: Data(Fixtures.spaces.utf8)
+            case ["query", "--windows"]: Data(Fixtures.windows.utf8)
+            default: Data()
+            }
+        }
+        defer { fake.stop() }
+        let snapshot = try await Yabai(socket: YabaiSocket(path: fake.path)).snapshot()
+        #expect(snapshot.windows.filter(\.hasFocus).map(\.id) == [104])
     }
 
     @Test func noYabai() async {

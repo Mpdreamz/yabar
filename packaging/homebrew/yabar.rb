@@ -21,6 +21,7 @@ cask "yabar" do
   depends_on macos: :sequoia
 
   app "Yabar.app"
+  binary "#{appdir}/Yabar.app/Contents/Helpers/yabar"
 
   uninstall quit: "io.github.mpdreamz.yabar"
 
