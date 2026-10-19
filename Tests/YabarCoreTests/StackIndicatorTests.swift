@@ -220,3 +220,41 @@ struct TabsTests {
         #expect(boxed == StackPlacement(side: .top, meetsScreen: false))
     }
 }
+
+struct AttentionTests {
+    @Test func readsBellsAndCounts() {
+        #expect(Attention(title: "🔔 ✳ Claude Code") == Attention())
+        #expect(Attention(title: "(3) Inbox") == Attention(count: 3))
+        #expect(Attention(title: "[12] Slack") == Attention(count: 12))
+        #expect(Attention(title: "✳ Claude Code") == nil)
+        #expect(Attention(title: "(0) Inbox") == nil)
+        #expect(Attention(title: "(beta) notes") == nil)
+        #expect(Attention(title: "Inbox (3)") == nil)
+        #expect(Attention(title: "(3] odd") == nil)
+    }
+
+    @Test func marksSpacesAndGoesRound() throws {
+        var snapshot = try Fixtures.snapshot()
+        func ring(_ id: Int) {
+            let index = snapshot.windows.firstIndex { $0.id == id }!
+            snapshot.windows[index].title = "🔔 " + snapshot.windows[index].title
+        }
+        ring(103)
+        ring(502)
+        #expect(snapshot.spacesNeedingAttention == [1, 5])
+        #expect(MenuBar.cells(snapshot).flatMap { $0 }.filter(\.needsAttention).map(\.index) == [1, 5])
+        #expect(MenuBar.cells(snapshot, options: MenuBarOptions(showAttention: false)).flatMap { $0 }
+            .filter(\.needsAttention).isEmpty)
+        #expect(snapshot.windowsNeedingAttention(after: 102) == [103, 502])
+        #expect(snapshot.windowsNeedingAttention(after: 103) == [502])
+        #expect(snapshot.windowsNeedingAttention(after: 501) == [502, 103])
+    }
+
+    @Test func aBellIsAChangeForTheMenuBar() throws {
+        let before = try Fixtures.snapshot()
+        var after = before
+        let index = after.windows.firstIndex { $0.id == 104 }!
+        after.windows[index].title = "(2) Inbox"
+        #expect(Changes(from: before, to: after).spaces)
+    }
+}

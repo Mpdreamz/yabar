@@ -20,10 +20,12 @@ public struct SpaceCell: Equatable, Sendable {
     /// The space holds at least one stack.
     public var hasStacks: Bool
     public var isNativeFullscreen: Bool
+    /// A window on the space wants attention (`Attention`).
+    public var needsAttention: Bool
 
     public init(
         index: Int, text: String, state: State, display: Int, isStackLayout: Bool = false, hasStacks: Bool = false,
-        isNativeFullscreen: Bool = false
+        isNativeFullscreen: Bool = false, needsAttention: Bool = false
     ) {
         self.index = index
         self.text = text
@@ -32,6 +34,7 @@ public struct SpaceCell: Equatable, Sendable {
         self.isStackLayout = isStackLayout
         self.hasStacks = hasStacks
         self.isNativeFullscreen = isNativeFullscreen
+        self.needsAttention = needsAttention
     }
 }
 
@@ -40,10 +43,13 @@ public struct MenuBarOptions: Equatable, Sendable {
     public var hideEmpty: Bool
     /// Show a space's label instead of its index when it has one.
     public var showLabels: Bool
+    /// Mark spaces holding a window that wants attention.
+    public var showAttention: Bool
 
-    public init(hideEmpty: Bool = false, showLabels: Bool = true) {
+    public init(hideEmpty: Bool = false, showLabels: Bool = true, showAttention: Bool = true) {
         self.hideEmpty = hideEmpty
         self.showLabels = showLabels
+        self.showAttention = showAttention
     }
 }
 
@@ -54,6 +60,7 @@ public enum MenuBar {
             snapshot.windows.filter { !$0.isMinimized && !$0.isHidden }.map(\.space)
         )
         let stacked = Set(snapshot.stacks.map(\.spaceIndex))
+        let wanting = options.showAttention ? snapshot.spacesNeedingAttention : []
         let displays = snapshot.displays.isEmpty
             ? Array(Set(snapshot.spaces.map(\.display))).sorted()
             : snapshot.displays.map(\.index)
@@ -73,7 +80,7 @@ public enum MenuBar {
                 return SpaceCell(
                     index: space.index, text: text, state: state, display: display,
                     isStackLayout: space.type == .stack, hasStacks: stacked.contains(space.index),
-                    isNativeFullscreen: space.isNativeFullscreen
+                    isNativeFullscreen: space.isNativeFullscreen, needsAttention: wanting.contains(space.index)
                 )
             }
         }.filter { !$0.isEmpty }

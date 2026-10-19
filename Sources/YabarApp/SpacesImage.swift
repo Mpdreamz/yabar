@@ -4,7 +4,8 @@ import YabarCore
 /// Draws the spaces for the menu bar as one template image, so it takes the menu bar's colour in light and dark mode
 /// and on any wallpaper: the focused space is a filled box with its text cut out, a space shown on another display an
 /// outlined box, one with windows plain text, an empty one faint text. A dot marks a space that holds a stack, and a
-/// dashed box a native fullscreen app. `rects` says where each space is, for clicks.
+/// dashed box a native fullscreen app, and a bar under it a space with a window that wants attention. `rects` says
+/// where each space is, for clicks.
 struct SpacesImage {
     let image: NSImage
     let rects: [(index: Int, rect: NSRect)]
@@ -76,6 +77,14 @@ struct SpacesImage {
             dashed.setLineDash([2, 2], count: 2, phase: 0)
             NSColor.black.withAlphaComponent(0.7).setStroke()
             dashed.stroke()
+        }
+        if cell.needsAttention {
+            NSColor.black.setFill()
+            NSBezierPath(
+                roundedRect: NSRect(x: rect.minX + 2, y: 0, width: rect.width - 4, height: 1.5),
+                xRadius: 0.75,
+                yRadius: 0.75
+            ).fill()
         }
         if cell.hasStacks || cell.isStackLayout {
             let dot = NSRect(x: rect.maxX - 4.5, y: rect.maxY - 4.5, width: 3, height: 3)

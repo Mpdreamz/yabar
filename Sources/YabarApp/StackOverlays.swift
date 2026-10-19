@@ -126,6 +126,7 @@ final class IndicatorView: NSView {
         let title: String
         /// The window's title alone (the app's name when it has none), for a tab.
         let label: String
+        let attention: Attention?
     }
 
     private var entries: [Entry] = []
@@ -165,7 +166,8 @@ final class IndicatorView: NSView {
                 isTop: item.isTop,
                 icon: window.flatMap { NSRunningApplication(processIdentifier: $0.pid)?.icon },
                 title: window.map { $0.title.isEmpty ? $0.app : "\($0.app) — \($0.title)" } ?? "",
-                label: window.map { $0.title.isEmpty ? $0.app : $0.title } ?? ""
+                label: window.map { $0.title.isEmpty ? $0.app : $0.title } ?? "",
+                attention: Preferences.showAttention ? window?.attention : nil
             )
         }
         removeAllToolTips()
@@ -189,6 +191,7 @@ final class IndicatorView: NSView {
             case .tabs: drawTab(entry)
             case .off: break
             }
+            if let attention = entry.attention, style != .pills { drawBadge(attention, on: entry) }
         }
     }
 
@@ -209,8 +212,10 @@ final class IndicatorView: NSView {
 
     private func drawPill(_ entry: Entry, alpha: CGFloat) {
         let pill = NSBezierPath(roundedRect: entry.rect, xRadius: entry.rect.width / 2, yRadius: entry.rect.width / 2)
-        let color = entry.isTop && stackHasFocus ? NSColor.controlAccentColor : NSColor.white
-        color.withAlphaComponent(alpha).setFill()
+        // A window that wants attention is red, at full strength whatever its place.
+        let color = entry.attention != nil ? NSColor.systemRed
+            : entry.isTop && stackHasFocus ? NSColor.controlAccentColor : NSColor.white
+        color.withAlphaComponent(entry.attention != nil ? 1 : alpha).setFill()
         pill.fill()
         NSColor.black.withAlphaComponent(0.35 * alpha).setStroke()
         pill.lineWidth = 0.5
@@ -252,6 +257,28 @@ final class IndicatorView: NSView {
         let textRect = NSRect(x: textX, y: entry.rect.midY - height / 2, width: inset.maxX - textX, height: height)
         if textRect
             .width > 8 { text.draw(with: textRect, options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine]) }
+    }
+
+    /// A red badge at the top right of an icon or a tab: the count when the title has one, else a dot. Always at full
+    /// strength, so a window low in a stack still shows it.
+    private func drawBadge(_ attention: Attention, on entry: Entry) {
+        let text = attention.count.map { NSAttributedString(string: $0 > 99 ? "99+" : String($0), attributes: [
+            .font: NSFont.systemFont(ofSize: 8.5, weight: .bold), .foregroundColor: NSColor.white,
+        ]) }
+        let height: CGFloat = text == nil ? 7 : 11
+        let width = max(height, (text?.size().width ?? 0) + 5)
+        let inset: CGFloat = style == .tabs ? 4 : -1
+        let badge = NSRect(
+            x: entry.rect.maxX - width - inset,
+            y: entry.rect.minY + (style == .tabs ? (entry.rect.height - height) / 2 : -1),
+            width: width, height: height
+        )
+        NSColor.systemRed.setFill()
+        NSBezierPath(roundedRect: badge, xRadius: height / 2, yRadius: height / 2).fill()
+        if let text {
+            let size = text.size()
+            text.draw(at: NSPoint(x: badge.midX - size.width / 2, y: badge.midY - size.height / 2))
+        }
     }
 
     private func entry(at event: NSEvent) -> Entry? {
