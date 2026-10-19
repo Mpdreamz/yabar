@@ -6,6 +6,9 @@
 #
 #   scripts/release-notes.sh <tag> <build> [how many earlier releases, default 20] >notes.html
 #
+# The first release has no others: the filter below then selects nothing, which grep reports as a failure, and under
+# pipefail that would end the script (and the release) without a word.
+#
 # A release's build (its CFBundleVersion, what Sparkle compares) comes from the appcast it shipped with; releases from
 # before yabar updated itself have none, and nobody updates from them through Sparkle, so they are left out.
 set -euo pipefail
@@ -37,7 +40,7 @@ section "$tag" "$build"
 
 gh release list -R "$repo" --exclude-drafts --exclude-pre-releases --limit 100 --json tagName,publishedAt \
     -q 'sort_by(.publishedAt) | reverse | .[].tagName' \
-    | grep -vx "$tag" \
+    | { grep -vx "$tag" || true; } \
     | while read -r older; do
         [ "$earlier" -gt 0 ] || break
         appcast="$(gh release download "$older" -R "$repo" -p appcast.xml -O - 2>/dev/null || true)"
