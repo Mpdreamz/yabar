@@ -32,8 +32,10 @@ public struct Yabai: Sendable {
         }
     }
 
-    public func run(_ args: [String]) async throws(YabaiError) {
-        _ = try await socket.send(args)
+    /// Sends a command; the reply is what yabai printed (empty for most commands).
+    @discardableResult
+    public func run(_ args: [String]) async throws(YabaiError) -> Data {
+        try await socket.send(args)
     }
 
     public func focus(window id: Int) async throws(YabaiError) {
@@ -69,9 +71,9 @@ public struct Yabai: Sendable {
 
     /// Best effort: a signal yabai no longer has is not an error worth stopping for.
     public func removeSignals() async {
-        try? await run(Signals.removeRule)
+        _ = try? await run(Signals.removeRule)
         for event in Signals.events {
-            try? await run(Signals.remove(event))
+            _ = try? await run(Signals.remove(event))
         }
     }
 }

@@ -6,7 +6,7 @@ import YabarCore
 /// While yabai is not running it looks again every few seconds, and adds its signals again once yabai is back.
 @MainActor
 final class Session {
-    private let yabai = Yabai()
+    let yabai = Yabai()
     private let listener = Listener()
     private let refresher: Refresher
     private let log = Logger(subsystem: "io.github.mpdreamz.yabar", category: "session")
@@ -19,6 +19,8 @@ final class Session {
     private(set) var error: YabaiError?
     /// Called on the main actor after every snapshot that differs from the one before, and when yabai goes away.
     var onChange: ((Changes) -> Void)?
+    /// yabai restarted (or came back): whatever Yabar set in it is gone.
+    var onRestart: (() -> Void)?
 
     init() {
         let yabai = yabai
@@ -67,6 +69,7 @@ final class Session {
         Task { [yabai, refresher, weak self] in
             do {
                 if try await !yabai.hasSignals() {
+                    self?.onRestart?()
                     await self?.addSignals()
                     await refresher.poke()
                 }
@@ -134,7 +137,10 @@ final class Session {
             retry = nil
             let changes = Changes(from: snapshot, to: new)
             snapshot = new
-            if cameBack { Task { await addSignals() } }
+            if cameBack {
+                onRestart?()
+                Task { await addSignals() }
+            }
             if !changes.isEmpty || cameBack { onChange?(changes) }
         case let .failure(failure):
             let wasRunning = error == nil

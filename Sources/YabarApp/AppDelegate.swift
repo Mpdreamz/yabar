@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let session = Session()
     private var spacesBar: SpacesBar?
     private var overlays: StackOverlays?
+    private lazy var room = RoomKeeper(yabai: session.yabai)
 
     func applicationDidFinishLaunching(_: Notification) {
         Updater.shared.start()
@@ -19,6 +20,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             if changes.spaces { drawSpaces() }
             overlays?.apply(changes, in: session.snapshot)
+            if !changes.added.isEmpty || !changes.removed.isEmpty || changes.spaces { makeRoom() }
+        }
+        session.onRestart = { [weak self] in
+            guard let self else { return }
+            Task { await room.forget() }
         }
         // A display added, removed or rearranged moves every stack's screen position.
         NotificationCenter.default.addObserver(
@@ -32,6 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminate(_: NSApplication) -> NSApplication.TerminateReply {
         Task {
+            await room.restore(session.snapshot)
             await session.stop()
             NSApp.reply(toApplicationShouldTerminate: true)
         }
@@ -40,6 +47,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func drawSpaces() {
         spacesBar?.draw(session.spaces)
+    }
+
+    /// Has yabai leave room beside the stacks for their indicators, or take it back.
+    private func makeRoom() {
+        guard let snapshot = session.snapshot else { return }
+        let placement = Preferences.indicatorPlacement
+        let depth = Preferences.roomDepth
+        Task { await room.update(snapshot, placement: placement, depth: depth) }
+    }
+
+    private func indicatorsChanged() {
+        overlays?.redraw(session.snapshot)
+        makeRoom()
     }
 
     // MARK: The menu
@@ -99,22 +119,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func indicatorMenu() -> NSMenuItem {
         let item = NSMenuItem(title: "Stack Indicators", action: nil, keyEquivalent: "")
-        let styles = NSMenu()
+        let submenu = NSMenu()
         for (style, title) in [(IndicatorStyle.icons, "Icons"), (.pills, "Pills"), (.off, "Off")] {
             let entry = NSMenuItem(title: title, action: #selector(chooseIndicatorStyle(_:)), keyEquivalent: "")
             entry.target = self
             entry.representedObject = style.rawValue
             entry.state = Preferences.indicatorStyle == style ? .on : .off
-            styles.addItem(entry)
+            submenu.addItem(entry)
         }
-        item.submenu = styles
+        submenu.addItem(.separator())
+        let placements: [(IndicatorPlacement, String)] = [
+            (.edges, "Screen Edge Side"), (.left, "Left"), (.right, "Right"), (.top, "Top"), (.bottom, "Bottom"),
+        ]
+        for (placement, title) in placements {
+            let entry = NSMenuItem(title: title, action: #selector(chooseIndicatorPlacement(_:)), keyEquivalent: "")
+            entry.target = self
+            entry.representedObject = placement.rawValue
+            entry.state = Preferences.indicatorPlacement == placement ? .on : .off
+            entry.indentationLevel = 1
+            submenu.addItem(entry)
+        }
+        submenu.addItem(.separator())
+        submenu.addItem(toggle("Make Room in yabai", on: Preferences.makeRoom, action: #selector(toggleMakeRoom)))
+        item.submenu = submenu
         return item
     }
 
     @objc private func chooseIndicatorStyle(_ item: NSMenuItem) {
         guard let raw = item.representedObject as? String, let style = IndicatorStyle(rawValue: raw) else { return }
         Preferences.indicatorStyle = style
-        overlays?.redraw(session.snapshot)
+        indicatorsChanged()
+    }
+
+    @objc private func chooseIndicatorPlacement(_ item: NSMenuItem) {
+        guard let raw = item.representedObject as? String,
+              let placement = IndicatorPlacement(rawValue: raw) else { return }
+        Preferences.indicatorPlacement = placement
+        indicatorsChanged()
+    }
+
+    @objc private func toggleMakeRoom() {
+        Preferences.makeRoom.toggle()
+        indicatorsChanged()
     }
 
     private func icon(for pid: Int32) -> NSImage? {
