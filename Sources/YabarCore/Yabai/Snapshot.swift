@@ -12,6 +12,25 @@ public struct Snapshot: Equatable, Sendable {
 
     public static let empty = Snapshot(displays: [], spaces: [], windows: [])
 
+    /// Without one process's windows: Yabar's own overlays, which yabai sees like any other window.
+    public func excluding(pid: Int32) -> Snapshot {
+        let mine = Set(windows.filter { $0.pid == pid }.map(\.id))
+        guard !mine.isEmpty else { return self }
+        var copy = self
+        copy.windows.removeAll { mine.contains($0.id) }
+        for index in copy.spaces.indices {
+            copy.spaces[index].windows.removeAll { mine.contains($0) }
+        }
+        return copy
+    }
+
+    /// The windows on a space, as yabai orders them, without minimized and hidden ones.
+    public func windows(onSpace index: Int) -> [Window] {
+        let order = space(index: index)?.windows ?? []
+        let byID = Dictionary(windows.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        return order.compactMap { byID[$0] }.filter { !$0.isMinimized && !$0.isHidden }
+    }
+
     public func spaces(on display: Display) -> [Space] {
         spaces.filter { $0.display == display.index }
     }

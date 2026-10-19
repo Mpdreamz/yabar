@@ -2,19 +2,22 @@ import AppKit
 import YabarCore
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
-    private var statusItem: NSStatusItem?
+final class AppDelegate: NSObject, NSApplicationDelegate {
     private let build = BuildInfo(info: Bundle.main.infoDictionary ?? [:])
     private let session = Session()
+    private var spacesBar: SpacesBar?
 
     func applicationDidFinishLaunching(_: Notification) {
         Updater.shared.start()
-        statusItem = makeStatusItem()
+        spacesBar = SpacesBar(
+            menu: { [unowned self] in makeMenu() },
+            focusSpace: { [unowned self] in session.focus(space: $0) }
+        )
         session.onChange = { [weak self] changes in
-            if changes.spaces { self?.drawStatus() }
+            if changes.spaces { self?.drawSpaces() }
         }
         session.start()
-        drawStatus()
+        drawSpaces()
     }
 
     func applicationShouldTerminate(_: NSApplication) -> NSApplication.TerminateReply {
@@ -25,56 +28,107 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return .terminateLater
     }
 
-    private func makeStatusItem() -> NSStatusItem {
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+    private func drawSpaces() {
+        spacesBar?.draw(session.spaces)
+    }
+
+    // MARK: The menu
+
+    private func makeMenu() -> NSMenu {
         let menu = NSMenu()
-        menu.delegate = self
-        item.menu = menu
-        return item
-    }
-
-    /// Until the spaces milestone draws them properly: the focused space's label or index, or a dash without yabai.
-    private func drawStatus() {
-        guard let button = statusItem?.button else { return }
-        if let space = session.snapshot?.focusedSpace {
-            button.image = nil
-            button.title = space.label.isEmpty ? String(space.index) : space.label
+        if let snapshot = session.snapshot {
+            addSpaces(of: snapshot, to: menu)
         } else {
-            let image = NSImage(systemSymbolName: "square.stack.3d.up", accessibilityDescription: "Yabar")
-            image?.isTemplate = true
-            button.image = image
-            button.title = ""
+            menu.addItem(disabled(yabaiStatus))
         }
-    }
-
-    func menuNeedsUpdate(_ menu: NSMenu) {
-        menu.removeAllItems()
-        let about = NSMenuItem(title: build.label, action: nil, keyEquivalent: "")
-        about.isEnabled = false
-        menu.addItem(about)
-        let status = NSMenuItem(title: yabaiStatus, action: nil, keyEquivalent: "")
-        status.isEnabled = false
-        menu.addItem(status)
         menu.addItem(.separator())
+        menu.addItem(toggle("Hide Empty Spaces", on: Preferences.hideEmptySpaces, action: #selector(toggleHideEmpty)))
+        menu.addItem(toggle(
+            "One Item per Display", on: Preferences.itemPerDisplay, action: #selector(toggleItemPerDisplay)
+        ))
+        menu.addItem(.separator())
+        menu.addItem(disabled(build.label))
         let check = NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
         check.target = self
         menu.addItem(check)
-        menu.addItem(.separator())
         menu.addItem(NSMenuItem(
             title: "Quit Yabar",
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
         ))
+        return menu
+    }
+
+    /// Every space with its windows under it; picking a space or a window focuses it.
+    private func addSpaces(of snapshot: Snapshot, to menu: NSMenu) {
+        let stacked = Set(snapshot.stacks.flatMap { $0.windows.map(\.id) })
+        for space in snapshot.spaces {
+            let title = space.label.isEmpty ? "Space \(space.index)" : "Space \(space.index) · \(space.label)"
+            let item = NSMenuItem(title: title, action: #selector(focusSpace(_:)), keyEquivalent: "")
+            item.target = self
+            item.tag = space.index
+            item.state = space.hasFocus ? .on : .off
+            menu.addItem(item)
+            for window in snapshot.windows(onSpace: space.index) {
+                let name = window.title.isEmpty || window.title == window.app
+                    ? window.app : "\(window.app) — \(window.title)"
+                let entry = NSMenuItem(
+                    title: String(name.prefix(70)), action: #selector(focusWindow(_:)), keyEquivalent: ""
+                )
+                entry.target = self
+                entry.tag = window.id
+                entry.indentationLevel = 1
+                entry.state = window.hasFocus ? .on : .off
+                entry.image = icon(for: window.pid)
+                if stacked.contains(window.id) { entry.badge = NSMenuItemBadge(string: "stack \(window.stackIndex)") }
+                menu.addItem(entry)
+            }
+        }
+    }
+
+    private func icon(for pid: Int32) -> NSImage? {
+        guard let icon = NSRunningApplication(processIdentifier: pid)?.icon?.copy() as? NSImage else { return nil }
+        icon.size = NSSize(width: 16, height: 16)
+        return icon
     }
 
     private var yabaiStatus: String {
         switch session.error {
-        case .none:
-            guard let snapshot = session.snapshot else { return "yabai: connecting…" }
-            return "yabai: \(snapshot.spaces.count) spaces, \(snapshot.stacks.count) stacks"
-        case .notRunning: return "yabai is not running"
-        case let .failed(message), let .io(message): return "yabai: \(message)"
+        case .none: "Connecting to yabai…"
+        case .notRunning: "yabai is not running"
+        case let .failed(message), let .io(message): "yabai: \(message)"
         }
+    }
+
+    private func disabled(_ title: String) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        item.isEnabled = false
+        return item
+    }
+
+    private func toggle(_ title: String, on: Bool, action: Selector) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+        item.target = self
+        item.state = on ? .on : .off
+        return item
+    }
+
+    @objc private func focusSpace(_ item: NSMenuItem) {
+        session.focus(space: item.tag)
+    }
+
+    @objc private func focusWindow(_ item: NSMenuItem) {
+        session.focus(window: item.tag)
+    }
+
+    @objc private func toggleHideEmpty() {
+        Preferences.hideEmptySpaces.toggle()
+        drawSpaces()
+    }
+
+    @objc private func toggleItemPerDisplay() {
+        Preferences.itemPerDisplay.toggle()
+        drawSpaces()
     }
 
     @objc private func checkForUpdates() {
