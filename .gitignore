@@ -1,0 +1,10 @@
+.build/
+build/
+.swiftpm/
+*.xcodeproj
+.DS_Store
+.cache/
+mise.local.toml
+.claude/worktrees/
+dist/
+.artifacts/
