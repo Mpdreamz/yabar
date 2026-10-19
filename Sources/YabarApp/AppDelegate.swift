@@ -7,7 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let session = Session()
     private var spacesBar: SpacesBar?
     private var overlays: StackOverlays?
-    private lazy var room = RoomKeeper(yabai: session.yabai, leftover: Preferences.roomSpaces)
+    private lazy var keeper = SpaceKeeper(yabai: session.yabai, leftover: Preferences.roomSpaces)
     private var signalSources: [DispatchSourceSignal] = []
     /// Quitting: nothing is redrawn or made room for any more.
     private var terminating = false
@@ -36,7 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         session.onRestart = { [weak self] in
             guard let self else { return }
-            Task { await room.forget() }
+            Task { await keeper.forget() }
         }
         // A display added, removed or rearranged moves every stack's screen position.
         NotificationCenter.default.addObserver(
@@ -59,8 +59,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !terminating else { return .terminateLater }
         terminating = true
         Task {
-            await room.restore(session.snapshot)
-            Preferences.roomSpaces = await room.changed
+            await keeper.restore(session.snapshot)
+            Preferences.roomSpaces = await keeper.changed
             await session.stop()
             NSApp.reply(toApplicationShouldTerminate: true)
         }
@@ -89,22 +89,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Has yabai leave room beside the stacks for their indicators, or take it back.
+    /// Keeps every space at its profile's layout, padding and gap, with room beside its stacks for their indicators.
     private func makeRoom() {
         guard !terminating, let snapshot = session.snapshot else { return }
-        let placement = Preferences.indicatorPlacement
-        let depth = Preferences.roomDepth
-        let style = Preferences.indicatorStyle
+        let plan = Preferences.plan(for: snapshot)
         Task {
-            await room.update(snapshot, placement: placement, depth: depth, style: style)
-            // Kept so a Yabar that is killed before it can put the room back has the next one do it.
-            let changed = await room.changed
+            await keeper.update(snapshot, plan: plan)
+            // Kept so a Yabar that is killed before it can put things back has the next one do it.
+            let changed = await keeper.changed
             if changed != Preferences.roomSpaces { Preferences.roomSpaces = changed }
         }
     }
 
     /// `kill`, a logout or a terminal's Ctrl-C quit like the menu does, so yabai gets its padding and gap back. A
     /// SIGKILL or a crash cannot; the spaces then wait for the next launch (`Preferences.roomSpaces`).
+    /// Profiles' layouts are put back the same way.
     private func quitOnSignals() {
         for signal in [SIGTERM, SIGINT, SIGHUP] {
             Darwin.signal(signal, SIG_IGN)
@@ -301,7 +300,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func showSettings() {
-        settings.show()
+        settings.show(scopes: ProfileScope.all(for: session.snapshot, profiles: Preferences.profiles))
     }
 
     @objc private func checkForUpdates() {

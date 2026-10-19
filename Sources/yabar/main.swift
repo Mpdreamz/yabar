@@ -38,12 +38,13 @@ func fail(_ message: String, code: Int32 = 1) -> Never {
 /// The way each stack runs, as Yabar.app would draw its indicators.
 func axisResolver(override: StackAxis?, snapshot: Snapshot) -> (Stack) -> StackAxis {
     if let override { return { _ in override } }
-    let app = UserDefaults(suiteName: "io.github.mpdreamz.yabar")
-    let style = app?.string(forKey: "indicatorStyle").flatMap(IndicatorStyle.init(rawValue:)) ?? .icons
-    let placement = app?.string(forKey: "indicatorPlacement").flatMap(IndicatorPlacement.init(rawValue:)) ?? .edges
-    guard style != .off else { return { _ in .vertical } }
+    let plan = SpacePlan.stored(in: UserDefaults(suiteName: "io.github.mpdreamz.yabar"), snapshot: snapshot)
     return { stack in
-        StackAxis(side: StackPlacement.resolve(stack, in: snapshot, placement: placement, style: style).side)
+        // Each space's own indicator style (its display's or space's profile), or the one chosen in Settings.
+        let style = snapshot.space(index: stack.spaceIndex).map { plan.style(for: $0, in: snapshot) } ?? plan.style
+        guard style != .off else { return .vertical }
+        return StackAxis(side: StackPlacement.resolve(stack, in: snapshot, placement: plan.placement, style: style)
+            .side)
     }
 }
 

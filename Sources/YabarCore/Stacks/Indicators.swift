@@ -2,7 +2,7 @@
 /// it), just outside the stack's frame, in the padding or the gap yabai leaves there (`Room`). Never over the window:
 /// apps draw their own title bars and toolbars, and nothing can know where those are. Everything is in yabai's
 /// coordinates.
-public enum IndicatorStyle: String, CaseIterable, Sendable {
+public enum IndicatorStyle: String, CaseIterable, Codable, Sendable {
     /// The app's icon on a rounded tile.
     case icons
     /// A slim pill per window.

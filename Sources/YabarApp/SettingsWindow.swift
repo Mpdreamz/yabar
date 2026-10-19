@@ -6,12 +6,17 @@ import YabarCore
 /// Yabar's settings: what the menu bar shows, how stacks are marked, and the app itself. Every choice is stored as it
 /// is made; the app redraws on its own (`Preferences.signature`).
 @MainActor
-final class SettingsWindow {
+final class SettingsWindow: NSObject, NSWindowDelegate {
     private var window: NSWindow?
+    /// The app that had focus before the window came forward, to give it back when the window closes.
+    private var previous: NSRunningApplication?
 
-    func show() {
-        if window == nil {
-            let window = NSWindow(contentViewController: NSHostingController(rootView: SettingsView()))
+    /// Opens (or brings forward) the window; `scopes` are the displays and labelled spaces profiles can be set for.
+    func show(scopes: [ProfileScope]) {
+        if let window {
+            window.contentViewController = NSHostingController(rootView: SettingsView(scopes: scopes))
+        } else {
+            let window = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(scopes: scopes)))
             window.title = "Yabar Settings"
             window.styleMask = [.titled, .closable]
             window.isReleasedWhenClosed = false
@@ -19,12 +24,21 @@ final class SettingsWindow {
             self.window = window
         }
         // A menu bar app has to come forward itself for its window to take the keyboard.
+        let front = NSWorkspace.shared.frontmostApplication
+        if front?.processIdentifier != ProcessInfo.processInfo.processIdentifier { previous = front }
+        window?.delegate = self
         NSApp.activate()
         window?.makeKeyAndOrderFront(nil)
+    }
+
+    func windowWillClose(_: Notification) {
+        previous?.activate()
+        previous = nil
     }
 }
 
 private struct SettingsView: View {
+    let scopes: [ProfileScope]
     @AppStorage(Preferences.Key.showLabels) private var showLabels = true
     @AppStorage(Preferences.Key.showAttention) private var showAttention = true
     @AppStorage(Preferences.Key.hideEmptySpaces) private var hideEmptySpaces = false
@@ -78,9 +92,10 @@ private struct SettingsView: View {
             } header: {
                 Text("Stack Indicators")
             } footer: {
-                Text(roomExplanation).font(.caption).foregroundStyle(.secondary)
+                Text(roomExplanation).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+            ProfilesSection(scopes: scopes)
             Section("Yabar") {
                 Toggle("Open at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, on in
@@ -103,8 +118,8 @@ private struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 440)
-        .fixedSize()
+        // Taller than a small screen otherwise; the form scrolls.
+        .frame(width: 460, height: 700)
         .onChange(of: style) { _, new in
             // Tabs only run across the top or bottom.
             if new == IndicatorStyle.tabs.rawValue, placement != IndicatorPlacement.bottom.rawValue {
