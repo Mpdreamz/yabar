@@ -36,6 +36,10 @@ final class FakeYabai: @unchecked Sendable {
         while true {
             let client = accept(fd, nil, nil)
             guard client >= 0 else { return }
+            // A client that gave up (its read timed out on a busy machine) must not take the test process down with
+            // SIGPIPE when the reply is written.
+            var on: Int32 = 1
+            setsockopt(client, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))
             var data = Data()
             var chunk = [UInt8](repeating: 0, count: 4096)
             while true {
