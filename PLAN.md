@@ -11,8 +11,9 @@
    each space's windows. Falls back to `CGSCopyManagedDisplaySpaces` when yabai is not running.
 4. **Stack indicators, stackline style.** Pills or app icons on the outer edge of each stack, unfocused dimmed,
    click to focus.
-5. **Stack indicators, i3 tabbed.** A tab strip (icon and title) along the top of each stack. Two placements: over the
-   stacked window's title bar, or in reserved room by raising the space's top padding while it holds a stack.
+5. **Stack indicators, i3 tabbed.** A tab strip (icon and title) along the top of each stack, in room yabai leaves.
+   Indicators are never drawn over a window: apps draw their own title bars and toolbars, so nothing over them can
+   be placed safely.
 6. **Settings and polish.** A settings window (menu bar, stack indicators, login and updates), launch at login
    (`SMAppService`).
 
