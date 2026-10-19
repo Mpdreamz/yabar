@@ -149,27 +149,38 @@ struct RoomTests {
     }
 }
 
-struct RoomKeeperTests {
-    @Test func appliesThenRestores() async throws {
-        let fake = try FakeYabai { args in
-            args.first == "config" ? Data((args[1] == "window_gap" ? "2" : "0").utf8) : Data()
+struct SpaceKeeperTests {
+    static func fake() throws -> FakeYabai {
+        try FakeYabai { args in
+            guard args.first == "config" else { return Data() }
+            return Data((args[1] == "window_gap" ? "2" : args[1] == "layout" ? "bsp" : "0").utf8)
         }
+    }
+
+    static func plan(_ profiles: Profiles = Profiles(), style: IndicatorStyle = .icons) -> SpacePlan {
+        SpacePlan(profiles: profiles, style: style, placement: .edges, builtIn: [])
+    }
+
+    @Test func appliesThenRestores() async throws {
+        let fake = try Self.fake()
         defer { fake.stop() }
-        let keeper = RoomKeeper(yabai: Yabai(socket: YabaiSocket(path: fake.path)))
+        let keeper = SpaceKeeper(yabai: Yabai(socket: YabaiSocket(path: fake.path)))
         var snapshot = try Fixtures.snapshot()
-        await keeper.update(snapshot, placement: .edges, depth: 30)
+        await keeper.update(snapshot, plan: Self.plan())
         let commands = fake.messages.filter { $0.first == "space" }
         #expect(commands.contains(["space", "1", "--padding", "abs:0:0:30:0"]))
         #expect(commands.contains(["space", "1", "--gap", "abs:2"]))
+        // Room only: no layout commands.
+        #expect(!commands.contains { $0.contains("--layout") })
         #expect(commands.count == 6)
 
         // Again: nothing changed, nothing sent.
-        await keeper.update(snapshot, placement: .edges, depth: 30)
+        await keeper.update(snapshot, plan: Self.plan())
         #expect(fake.messages.count(where: { $0.first == "space" }) == 6)
 
         // Space 2's stack goes: it gets yabai's values back.
         snapshot.windows.removeAll { $0.space == 2 }
-        await keeper.update(snapshot, placement: .edges, depth: 30)
+        await keeper.update(snapshot, plan: Self.plan())
         #expect(fake.messages.suffix(2) == [
             ["space", "2", "--padding", "abs:0:0:0:0"],
             ["space", "2", "--gap", "abs:2"],
@@ -178,6 +189,87 @@ struct RoomKeeperTests {
         await keeper.restore(snapshot)
         let total = fake.messages.count(where: { $0.first == "space" })
         #expect(total == 12)
+        #expect(await keeper.changed.isEmpty)
+
+        // Restored for good: an update that arrives late does nothing.
+        try await keeper.update(Fixtures.snapshot(), plan: Self.plan())
+        #expect(fake.messages.count(where: { $0.first == "space" }) == 12)
+    }
+
+    /// A run that was killed left changes on spaces 1 and 2; the next one keeps what it still needs and puts the rest
+    /// back.
+    @Test func cleansUpAfterAnEarlierRun() async throws {
+        let fake = try Self.fake()
+        defer { fake.stop() }
+        let keeper = SpaceKeeper(yabai: Yabai(socket: YabaiSocket(path: fake.path)), leftover: [3, 8])
+        #expect(await keeper.changed == [3, 8])
+        try await keeper.update(Fixtures.snapshot(), plan: Self.plan(style: .off))
+        let commands = fake.messages.filter { $0.first == "space" }
+        #expect(commands.contains(["space", "1", "--padding", "abs:0:0:0:0"]))
+        #expect(commands.contains(["space", "3", "--padding", "abs:0:0:0:0"]))
+        // Never a layout: yabai rebuilds a space on --layout, even to the one it has, and its stacks dissolve.
+        #expect(!commands.contains { $0.contains("--layout") })
+        #expect(await keeper.changed.isEmpty)
+    }
+
+    @Test func profilesSetLayoutAndPaddingAndComeBack() async throws {
+        let fake = try Self.fake()
+        defer { fake.stop() }
+        let keeper = SpaceKeeper(yabai: Yabai(socket: YabaiSocket(path: fake.path)))
+        var profiles = Profiles()
+        profiles.external = SpaceSettings(top: 12, gap: 8)
+        profiles.spaces["code"] = SpaceSettings(layout: .stack)
+        let snapshot = try Fixtures.snapshot()
+        await keeper.update(snapshot, plan: Self.plan(profiles, style: .off))
+        let commands = fake.messages.filter { $0.first == "space" }
+        #expect(commands.contains(["space", "1", "--layout", "stack"]))
+        #expect(commands.contains(["space", "1", "--padding", "abs:12:0:0:0"]))
+        #expect(commands.contains(["space", "4", "--gap", "abs:8"]))
+        #expect(!commands.contains(["space", "2", "--layout", "stack"]))
+        #expect(await keeper.changed.count == 5)
+
+        await keeper.restore(snapshot)
+        #expect(fake.messages.contains(["space", "1", "--layout", "bsp"]))
+        #expect(fake.messages.suffix(2) != [])
+    }
+}
+
+struct ProfilesTests {
+    @Test func broadToSpecific() throws {
+        let snapshot = try Fixtures.snapshot()
+        var profiles = Profiles()
+        profiles.builtIn = SpaceSettings(layout: .stack, gap: 0)
+        profiles.external = SpaceSettings(layout: .bsp, gap: 10, indicatorStyle: .tabs)
+        profiles.displays["5F1A6F0E-6E1B-4C4A-9C55-2B0D6C5B7F11"] = SpaceSettings(gap: 16)
+        profiles.spaces["code"] = SpaceSettings(left: 40)
+
+        // Display 1 is built in; space 1 is labelled "code".
+        let code = profiles.settings(for: snapshot.spaces[0], in: snapshot, builtIn: [1])
+        #expect(code == SpaceSettings(layout: .stack, left: 40, gap: 0))
+        // Display 2 is external and has its own gap.
+        let side = profiles.settings(for: snapshot.spaces[4], in: snapshot, builtIn: [1])
+        #expect(side == SpaceSettings(layout: .bsp, gap: 16, indicatorStyle: .tabs))
+    }
+
+    @Test func styleAndRoomPerDisplay() throws {
+        let snapshot = try Fixtures.snapshot()
+        var profiles = Profiles()
+        profiles.external = SpaceSettings(indicatorStyle: .off)
+        let plan = SpacePlan(profiles: profiles, style: .icons, placement: .edges, builtIn: [1])
+        #expect(plan.style(for: snapshot.spaces[0], in: snapshot) == .icons)
+        #expect(plan.style(for: snapshot.spaces[4], in: snapshot) == .off)
+        let base = SpaceTarget(room: Room(), layout: .bsp)
+        let targets = plan.targets(snapshot, base: base)
+        #expect(targets[3]?.room == Room(left: 30))
+        // Indicators off on the external display: no room for space 5's stack.
+        #expect(targets[13]?.room == Room())
+    }
+
+    @Test func storedAsJSON() throws {
+        var profiles = Profiles()
+        profiles.spaces["chat"] = SpaceSettings(layout: .stack, indicatorStyle: .tabs)
+        let data = try JSONEncoder().encode(profiles)
+        #expect(try JSONDecoder().decode(Profiles.self, from: data) == profiles)
     }
 }
 

@@ -15,6 +15,7 @@ enum Preferences {
         static let indicatorStyle = "indicatorStyle"
         static let indicatorPlacement = "indicatorPlacement"
         static let spaceLabels = "spaceLabels"
+        static let profiles = "profiles"
         /// Spaces whose padding or gap Yabar changed and has not put back yet (space ids).
         static let roomSpaces = "roomSpaces"
     }
@@ -52,9 +53,15 @@ enum Preferences {
         set { defaults.set(newValue.rawValue, forKey: Key.indicatorPlacement) }
     }
 
-    /// How much room yabai is to leave beside each stack, or nil when indicators are off.
-    static var roomDepth: Double? {
-        indicatorStyle == .off ? nil : IndicatorMetrics().room(indicatorStyle)
+    /// Layout, padding, gap and indicators per display and per space (`Profiles`).
+    static var profiles: Profiles {
+        get { SpacePlan.storedProfiles(in: defaults) }
+        set { defaults.set(try? JSONEncoder().encode(newValue), forKey: Key.profiles) }
+    }
+
+    /// Everything that decides what Yabar keeps each space at, for this snapshot's displays.
+    static func plan(for snapshot: Snapshot) -> SpacePlan {
+        SpacePlan.stored(in: defaults, snapshot: snapshot)
     }
 
     /// Space labels, kept so they can be put back when yabai forgets them (`SpaceLabels`).
@@ -90,6 +97,7 @@ enum Preferences {
         [
             "\(showLabels)", "\(showAttention)", "\(hideEmptySpaces)", "\(itemPerDisplay)", indicatorStyle.rawValue,
             indicatorPlacement.rawValue,
+            String(decoding: (try? JSONEncoder().encode(profiles)) ?? Data(), as: UTF8.self),
         ].joined(separator: "|")
     }
 }

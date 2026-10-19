@@ -28,30 +28,38 @@ public struct Room: Equatable, Sendable {
         ]
     }
 
-    /// What each space with stacks needs, starting from `base` (yabai's configured padding and gap), keyed by space id:
-    /// padding on the side a stack's indicators take where it meets the screen, a wider gap where it has windows on
-    /// every
-    /// side (`StackPlacement` decides which). Whether a stack meets the screen is read from its neighbours, not its
-    /// distance to the edge, so the answer does not change once the padding moves it.
+    /// This room, with enough for one stack's indicators: padding on the side they take where the stack meets the
+    /// screen, a wider gap where it has windows on every side (`StackPlacement` decides which). Whether a stack meets
+    /// the screen is read from its neighbours, not its distance to the edge, so the answer does not change once the
+    /// padding moves it.
+    public func making(
+        room depth: Double, for stack: Stack, in snapshot: Snapshot, placement: IndicatorPlacement,
+        style: IndicatorStyle
+    ) -> Room {
+        var room = self
+        let resolved = StackPlacement.resolve(stack, in: snapshot, placement: placement, style: style)
+        if resolved.meetsScreen {
+            switch resolved.side {
+            case .left: room.left = max(room.left, depth)
+            case .right: room.right = max(room.right, depth)
+            case .top: room.top = max(room.top, depth)
+            case .bottom: room.bottom = max(room.bottom, depth)
+            }
+        } else {
+            room.gap = max(room.gap, depth)
+        }
+        return room
+    }
+
+    /// What each space with stacks needs, starting from `base`, keyed by space id (only spaces holding stacks).
     public static func needed(
         _ snapshot: Snapshot, placement: IndicatorPlacement, depth: Double, base: Room, style: IndicatorStyle = .icons
     ) -> [UInt64: Room] {
         var rooms: [UInt64: Room] = [:]
         for stack in snapshot.stacks {
             guard let space = snapshot.space(index: stack.spaceIndex) else { continue }
-            let resolved = StackPlacement.resolve(stack, in: snapshot, placement: placement, style: style)
-            var room = rooms[space.id] ?? base
-            if resolved.meetsScreen {
-                switch resolved.side {
-                case .left: room.left = max(room.left, depth)
-                case .right: room.right = max(room.right, depth)
-                case .top: room.top = max(room.top, depth)
-                case .bottom: room.bottom = max(room.bottom, depth)
-                }
-            } else {
-                room.gap = max(room.gap, depth)
-            }
-            rooms[space.id] = room
+            rooms[space.id] = (rooms[space.id] ?? base)
+                .making(room: depth, for: stack, in: snapshot, placement: placement, style: style)
         }
         return rooms
     }

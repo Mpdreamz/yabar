@@ -40,7 +40,8 @@ final class StackOverlays {
     }
 
     private func show(_ stack: Stack, in snapshot: Snapshot) {
-        let style = Preferences.indicatorStyle
+        let plan = Preferences.plan(for: snapshot)
+        let style = snapshot.space(index: stack.spaceIndex).map { plan.style(for: $0, in: snapshot) } ?? plan.style
         guard style != .off else {
             panels.removeValue(forKey: stack.id)?.close()
             return
