@@ -115,7 +115,6 @@ public struct Window: Codable, Hashable, Sendable, Identifiable {
     /// 0 outside a stack; 1… for the windows of a stack, in stack order.
     public var stackIndex: Int
     public var hasFocus: Bool
-    /// In a stack, only the window on top is visible.
     public var isVisible: Bool
     public var isMinimized: Bool
     public var isHidden: Bool

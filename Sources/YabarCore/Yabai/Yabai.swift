@@ -50,6 +50,7 @@ public struct Yabai: Sendable {
     }
 
     public func addSignals(listener path: String = Signals.listenerPath) async throws(YabaiError) {
+        try await run(Signals.addRule)
         for event in Signals.events {
             try await run(Signals.add(event, listener: path))
         }
@@ -68,6 +69,7 @@ public struct Yabai: Sendable {
 
     /// Best effort: a signal yabai no longer has is not an error worth stopping for.
     public func removeSignals() async {
+        try? await run(Signals.removeRule)
         for event in Signals.events {
             try? await run(Signals.remove(event))
         }

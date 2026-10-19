@@ -43,7 +43,7 @@ struct StackTests {
     @Test func groupsBySpaceAndFrame() throws {
         let stacks = try Fixtures.snapshot().stacks
         #expect(stacks.map { $0.windows.map(\.id) } == [[101, 102, 103], [201, 202], [501, 502]])
-        #expect(stacks[0].top?.id == 102)
+        #expect(stacks[0].focused?.id == 102)
         #expect(stacks[0].hasFocus)
         #expect(!stacks[1].hasFocus)
         #expect(stacks[2].spaceIndex == 5)
@@ -174,7 +174,8 @@ struct SocketTests {
         let yabai = Yabai(socket: YabaiSocket(path: fake.path))
         try await yabai.addSignals(listener: "/tmp/yabar_x.socket")
         await yabai.removeSignals()
-        #expect(fake.messages.count == Signals.events.count * 2)
+        #expect(fake.messages.count == Signals.events.count * 2 + 2)
+        #expect(fake.messages.first == Signals.addRule)
         #expect(fake.messages.last == ["signal", "--remove", "yabar-dock_did_restart"])
     }
 }
