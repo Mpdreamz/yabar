@@ -1,0 +1,224 @@
+name: release
+
+# The release step, run by hand (Actions > release > Run workflow, or `gh workflow run release`): builds main at the
+# version release-drafter worked out (or the one given), attaches the app to the draft, checks it is there, and only
+# then publishes the draft, which creates the tag on the commit that was built. A published release always has its
+# files.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, e.g. 0.1.0 (empty: the draft's)"
+        required: false
+      dry_run:
+        description: "Dry run: build, sign and notarize, keep the zip on the run, release nothing"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    # Releases come from main; a dry run may try a branch.
+    if: github.ref == 'refs/heads/main' || inputs.dry_run
+    runs-on: macos-26
+    # Room for an hour of notarization on top of the build.
+    timeout-minutes: 100
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Signing and notarizing need all six secrets (scripts/release-secrets.sh stores them); without them the release
+      # is ad-hoc signed, which the install script handles but browsers and Homebrew warn about.
+      NOTARIZE: ${{ secrets.DEVELOPER_ID_P12 != '' && secrets.NOTARY_KEY_P8 != '' }}
+      # Signing updates needs the Sparkle key (scripts/release-secrets.sh --sparkle stores it); without it the release
+      # has no appcast, and installed copies are not offered it.
+      SPARKLE: ${{ secrets.SPARKLE_PRIVATE_KEY != '' }}
+    steps:
+      # All of main's history: the build number is its commit count (scripts/bundle.sh), which the updater compares.
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Find the draft
+        id: draft
+        run: |
+          draft="$(gh api "repos/$GITHUB_REPOSITORY/releases" --jq '[.[] | select(.draft)][0] // empty')"
+          # A dry run that names its version needs no draft (there is none between a release and the next merge).
+          if [ -z "$draft" ] && [ "${{ inputs.dry_run }}" = "true" ] && [ -n "${{ inputs.version }}" ]; then
+            echo "tag=v${{ inputs.version }}" >>"$GITHUB_OUTPUT"
+            echo "version=${{ inputs.version }}" >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -z "$draft" ]; then
+            echo "No draft release: release-drafter makes one when a pull request merges." >&2
+            exit 1
+          fi
+          tag="$(jq -r .tag_name <<<"$draft")"
+          wanted="${{ inputs.version }}"
+          if [ -n "$wanted" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
+            tag="v$wanted"
+          elif [ -n "$wanted" ] && [ "v$wanted" != "$tag" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$(jq -r .id <<<"$draft")" \
+              -f tag_name="v$wanted" -f name="v$wanted" >/dev/null
+            tag="v$wanted"
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" >/dev/null 2>&1; then
+            echo "$tag is already released." >&2
+            exit 1
+          fi
+          echo "tag=$tag" >>"$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >>"$GITHUB_OUTPUT"
+
+      - uses: ./.github/actions/setup
+
+      - name: Test
+        run: mise run test
+
+      - name: Release build
+        env:
+          YABAR_VERSION: ${{ steps.draft.outputs.version }}
+        run: |
+          mise run bundle
+          shown="$(plutil -extract CFBundleShortVersionString raw build/Yabar.app/Contents/Info.plist)"
+          [ "$shown" = "$YABAR_VERSION" ] || { echo "Info.plist says $shown, not $YABAR_VERSION" >&2; exit 1; }
+          # The updater compares build numbers: main's commit count, never a shallow clone's 1.
+          build="$(plutil -extract CFBundleVersion raw build/Yabar.app/Contents/Info.plist)"
+          [ "$build" = "$(git rev-list --count HEAD)" ] && [ "$build" -gt 1 ] \
+            || { echo "CFBundleVersion is $build, not main's commit count" >&2; exit 1; }
+
+      - name: Sign with the Developer ID
+        if: env.NOTARIZE == 'true'
+        env:
+          P12: ${{ secrets.DEVELOPER_ID_P12 }}
+          P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+        run: |
+          # A keychain of its own, deleted when the job ends (see the last step).
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          password="$(openssl rand -hex 24)"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          base64 --decode <<<"$P12" >"$RUNNER_TEMP/developer-id.p12"
+          security import "$RUNNER_TEMP/developer-id.p12" -k "$keychain" -P "$P12_PASSWORD" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/developer-id.p12"
+          # The intermediate certificate, so codesign can build the chain to Apple.
+          curl -fsSL -o "$RUNNER_TEMP/DeveloperIDG2CA.cer" https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
+          security import "$RUNNER_TEMP/DeveloperIDG2CA.cer" -k "$keychain"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          identity="$(security find-identity -v -p codesigning "$keychain" \
+            | grep -o '"Developer ID Application: [^"]*"' | tr -d '"' | head -1)"
+          [ -n "$identity" ] || { echo "No Developer ID Application identity in DEVELOPER_ID_P12" >&2; exit 1; }
+          scripts/sign.sh "$identity" "$keychain"
+
+      - name: Notarize and staple the app
+        if: env.NOTARIZE == 'true'
+        env:
+          KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+          KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          ISSUER: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: scripts/notarize.sh build/Yabar.app
+
+      - name: Package the zip
+        run: |
+          mkdir -p dist
+          ditto -c -k --keepParent build/Yabar.app dist/Yabar-arm64.zip
+
+      - name: Checksums
+        run: |
+          cd dist
+          shasum -a 256 Yabar-arm64.zip >Yabar-arm64.zip.sha256
+          cat ./*.sha256
+
+      # The appcast installed copies read (scripts/appcast.sh): the zip's EdDSA signature and length, the release notes
+      # since the installed version (scripts/release-notes.sh), and a signature over the feed itself. The key goes to
+      # sign_update on stdin, never on a command line or disk.
+      - name: Sign the update and write the appcast
+        if: env.SPARKLE == 'true' && env.NOTARIZE == 'true'
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          VERSION: ${{ steps.draft.outputs.version }}
+          TAG: ${{ steps.draft.outputs.tag }}
+        run: |
+          source packaging/sparkle/sparkle.lock
+          tools="$RUNNER_TEMP/sparkle"
+          mkdir -p "$tools"
+          curl -fsSL -o "$tools/sparkle.tar.xz" \
+            "https://github.com/sparkle-project/Sparkle/releases/download/$version/Sparkle-$version.tar.xz"
+          echo "$sha256  $tools/sparkle.tar.xz" | shasum -a 256 -c -
+          tar -xf "$tools/sparkle.tar.xz" -C "$tools" ./bin/sign_update
+          # The key must be the one installed copies trust: its public half is Info.plist's SUPublicEDKey. A mismatch
+          # would ship a release whose own updates it refuses. (generate_keys -x writes the 32-byte seed; older keys
+          # carry the public key as their last 32 bytes.)
+          openssl="$(brew --prefix openssl@3)/bin/openssl"
+          raw="$RUNNER_TEMP/key.raw"
+          base64 -d <<<"$SPARKLE_PRIVATE_KEY" >"$raw"
+          if [ "$(wc -c <"$raw" | tr -d ' ')" = 96 ]; then
+            derived="$(tail -c 32 "$raw" | base64)"
+          else
+            derived="$({ printf '\x30\x2e\x02\x01\x00\x30\x05\x06\x03\x2b\x65\x70\x04\x22\x04\x20'; head -c 32 "$raw"; } \
+              | "$openssl" pkey -inform DER -pubout -outform DER | tail -c 32 | base64)"
+          fi
+          rm -f "$raw"
+          trusted="$(plutil -extract SUPublicEDKey raw build/Yabar.app/Contents/Info.plist)"
+          [ -n "$derived" ] && [ "$derived" = "$trusted" ] \
+            || { echo "SPARKLE_PRIVATE_KEY does not match SUPublicEDKey ($trusted) in Info.plist" >&2; exit 1; }
+          signature="$("$tools/bin/sign_update" --ed-key-file - -p dist/Yabar-arm64.zip <<<"$SPARKLE_PRIVATE_KEY")"
+          length="$(stat -f %z dist/Yabar-arm64.zip)"
+          build="$(plutil -extract CFBundleVersion raw build/Yabar.app/Contents/Info.plist)"
+          # This release's notes and those of the releases before it, which Sparkle cuts off at the installed version
+          # (a dry run with a version of its own has no draft, and says so).
+          scripts/release-notes.sh "$TAG" "$build" >"$RUNNER_TEMP/notes.html"
+          scripts/appcast.sh "$VERSION" "$build" "$signature" "$length" "$RUNNER_TEMP/notes.html" >dist/appcast.xml
+          "$tools/bin/sign_update" --ed-key-file - dist/appcast.xml <<<"$SPARKLE_PRIVATE_KEY"
+          "$tools/bin/sign_update" --ed-key-file - --verify dist/appcast.xml <<<"$SPARKLE_PRIVATE_KEY"
+          xmllint --noout dist/appcast.xml
+
+      - name: No appcast without the Sparkle key
+        if: env.SPARKLE != 'true'
+        run: |
+          echo "::warning::No SPARKLE_PRIVATE_KEY: this release has no appcast, so installed copies are not offered it."
+
+      - name: Keep the files on the run
+        if: inputs.dry_run
+        uses: actions/upload-artifact@v4
+        with:
+          name: Yabar-${{ steps.draft.outputs.version }}-dry-run
+          path: dist/*
+
+      - name: Attach to the draft
+        if: ${{ !inputs.dry_run }}
+        run: gh release upload "${{ steps.draft.outputs.tag }}" dist/* --clobber
+
+      - name: Check the draft has every file
+        if: ${{ !inputs.dry_run }}
+        run: |
+          names="$(gh release view "${{ steps.draft.outputs.tag }}" --json assets --jq '[.assets[].name] | sort | join(" ")')"
+          wanted="Yabar-arm64.zip Yabar-arm64.zip.sha256"
+          if [ "$SPARKLE" = "true" ] && [ "$NOTARIZE" = "true" ]; then wanted="$wanted appcast.xml"; fi
+          wanted="$(tr ' ' '\n' <<<"$wanted" | LC_ALL=C sort | tr '\n' ' ' | sed 's/ $//')"
+          [ "$names" = "$wanted" ] || { echo "draft has: $names" >&2; exit 1; }
+
+      - name: Publish
+        if: ${{ !inputs.dry_run }}
+        run: gh release edit "${{ steps.draft.outputs.tag }}" --draft=false --latest --target "$GITHUB_SHA"
+
+      # Only notarized releases go to Homebrew: casks are quarantined, and an ad-hoc signed app would not open.
+      - name: Update the Homebrew tap
+        if: ${{ !inputs.dry_run && env.NOTARIZE == 'true' }}
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -z "$TAP_TOKEN" ]; then
+            echo "::warning::No HOMEBREW_TAP_TOKEN: the tap was not updated. Run the tap workflow once it is set."
+            exit 0
+          fi
+          scripts/bump-tap.sh "${{ steps.draft.outputs.version }}"
+
+      - name: Remove the signing keychain
+        if: always()
+        run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" 2>/dev/null || true
