@@ -6,7 +6,15 @@ public enum IndicatorStyle: String, CaseIterable, Sendable {
     case icons
     /// A slim pill per window.
     case pills
+    /// i3's tabbed layout: a strip of tabs, each with the window's icon and title, across the top (or bottom) of the
+    /// stack, sharing its width.
+    case tabs
     case off
+
+    /// Tabs need a title's width, so they only run across the top or the bottom.
+    public var runsAcrossOnly: Bool {
+        self == .tabs
+    }
 }
 
 /// Which side of a stack its indicators run along.
@@ -23,8 +31,13 @@ public enum Side: Equatable, Hashable, Sendable {
         self == .left || self == .right
     }
 
-    /// The side a stack's indicators go on.
-    public init(_ placement: IndicatorPlacement, frame: Frame, display: Frame?) {
+    /// The side a stack's indicators go on. Styles that only run across take the bottom when asked for it, else the
+    /// top.
+    public init(_ placement: IndicatorPlacement, frame: Frame, display: Frame?, style: IndicatorStyle = .icons) {
+        if style.runsAcrossOnly {
+            self = placement == .bottom ? .bottom : .top
+            return
+        }
         switch placement {
         case .left: self = .left
         case .right: self = .right
@@ -43,6 +56,8 @@ public struct IndicatorMetrics: Equatable, Sendable {
     public var size: Double = 24
     /// A pill's width.
     public var pill: Double = 5
+    /// A tab's height.
+    public var tab: Double = 22
     /// Between an indicator and the stack's edge (and the far side of the strip).
     public var margin: Double = 3
     public var spacing: Double = 6
@@ -51,7 +66,11 @@ public struct IndicatorMetrics: Equatable, Sendable {
 
     /// How deep a strip of indicators is, across the side it runs along.
     public func depth(_ style: IndicatorStyle) -> Double {
-        style == .pills ? pill : size
+        switch style {
+        case .pills: pill
+        case .tabs: tab
+        case .icons, .off: size
+        }
     }
 
     /// The room to make for a strip: the indicators and a margin on either side.
@@ -86,7 +105,7 @@ public struct IndicatorLayout: Equatable, Sendable {
         let count = Double(stack.windows.count)
 
         // Along the side: where the row starts and how much of the side it may use.
-        let start: Double
+        var start: Double
         let length: Double
         if side.isVertical {
             start = outside ? metrics.margin : IndicatorLayout.titleBarClearance.down
@@ -95,11 +114,19 @@ public struct IndicatorLayout: Equatable, Sendable {
             start = outside ? metrics.margin : IndicatorLayout.titleBarClearance.across
             length = frame.w
         }
-        let available = max(length - start - metrics.margin, depth)
+        var available = max(length - start - metrics.margin, depth)
         var extent = metrics.size
         var spacing = metrics.spacing
-        // Shrink to fit a tall stack in a short side rather than run past its end.
-        if count * (extent + spacing) - spacing > available {
+        if style == .tabs {
+            // Tabs share the side between them, edge to edge when outside the stack.
+            if outside {
+                start = 0
+                available = length
+            }
+            spacing = 2
+            extent = max(4, (available - (count - 1) * spacing) / count)
+        } else if count * (extent + spacing) - spacing > available {
+            // Shrink to fit a tall stack in a short side rather than run past its end.
             extent = max(4, (available - (count - 1) * 2) / count)
             spacing = 2
         }

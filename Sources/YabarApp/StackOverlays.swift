@@ -9,9 +9,11 @@ final class StackOverlays {
     private var panels: [Stack.ID: IndicatorPanel] = [:]
     private var tops = StackTops()
     private let focus: (Int) -> Void
+    private let close: (Int) -> Void
 
-    init(focus: @escaping (Int) -> Void) {
+    init(focus: @escaping (Int) -> Void, close: @escaping (Int) -> Void) {
         self.focus = focus
+        self.close = close
     }
 
     func apply(_ changes: Changes, in snapshot: Snapshot?) {
@@ -44,12 +46,12 @@ final class StackOverlays {
             return
         }
         let placement = StackPlacement.resolve(
-            stack, in: snapshot, placement: Preferences.indicatorPlacement, room: Preferences.roomMode
+            stack, in: snapshot, placement: Preferences.indicatorPlacement, room: Preferences.roomMode, style: style
         )
         let layout = IndicatorLayout(
             stack: stack, top: tops.top(of: stack.id), side: placement.side, outside: placement.outside, style: style
         )
-        let panel = panels[stack.id] ?? IndicatorPanel(focus: focus)
+        let panel = panels[stack.id] ?? IndicatorPanel(focus: focus, close: close)
         panels[stack.id] = panel
         panel.show(layout, stack: stack, style: style, space: stack.id.space)
     }
@@ -73,8 +75,8 @@ func appKitRect(_ frame: Frame) -> NSRect {
 final class IndicatorPanel: NSPanel {
     private let indicators: IndicatorView
 
-    init(focus: @escaping (Int) -> Void) {
-        indicators = IndicatorView(focus: focus)
+    init(focus: @escaping (Int) -> Void, close: @escaping (Int) -> Void) {
+        indicators = IndicatorView(focus: focus, close: close)
         super.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         isOpaque = false
         backgroundColor = .clear
@@ -124,15 +126,19 @@ final class IndicatorView: NSView {
         let isTop: Bool
         let icon: NSImage?
         let title: String
+        /// The window's title alone (the app's name when it has none), for a tab.
+        let label: String
     }
 
     private var entries: [Entry] = []
     private var style = IndicatorStyle.icons
     private var stackHasFocus = false
     private let focus: (Int) -> Void
+    private let close: (Int) -> Void
 
-    init(focus: @escaping (Int) -> Void) {
+    init(focus: @escaping (Int) -> Void, close: @escaping (Int) -> Void) {
         self.focus = focus
+        self.close = close
         super.init(frame: .zero)
     }
 
@@ -160,7 +166,8 @@ final class IndicatorView: NSView {
                 rect: NSRect(x: item.frame.x, y: item.frame.y, width: item.frame.w, height: item.frame.h),
                 isTop: item.isTop,
                 icon: window.flatMap { NSRunningApplication(processIdentifier: $0.pid)?.icon },
-                title: window.map { $0.title.isEmpty ? $0.app : "\($0.app) — \($0.title)" } ?? ""
+                title: window.map { $0.title.isEmpty ? $0.app : "\($0.app) — \($0.title)" } ?? "",
+                label: window.map { $0.title.isEmpty ? $0.app : $0.title } ?? ""
             )
         }
         removeAllToolTips()
@@ -181,6 +188,7 @@ final class IndicatorView: NSView {
             switch style {
             case .icons: drawIcon(entry, alpha: alpha)
             case .pills: drawPill(entry, alpha: alpha)
+            case .tabs: drawTab(entry)
             case .off: break
             }
         }
@@ -211,10 +219,54 @@ final class IndicatorView: NSView {
         pill.stroke()
     }
 
-    override func mouseDown(with event: NSEvent) {
-        let point = convert(event.locationInWindow, from: nil)
-        if let entry = entries.first(where: { $0.rect.insetBy(dx: -2, dy: -2).contains(point) }) {
-            focus(entry.windowID)
+    /// i3's tab: the window on top filled (in the accent colour while the stack has focus), the rest dark; the app's
+    /// icon, then the title, cut short to fit.
+    private func drawTab(_ entry: Entry) {
+        let tab = NSBezierPath(roundedRect: entry.rect, xRadius: 4, yRadius: 4)
+        let fill: NSColor = switch (entry.isTop, stackHasFocus) {
+        case (true, true): .controlAccentColor
+        case (true, false): NSColor(white: 0.38, alpha: 1)
+        case (false, _): NSColor(white: 0.14, alpha: 1)
         }
+        fill.setFill()
+        tab.fill()
+        NSColor(white: 1, alpha: 0.12).setStroke()
+        tab.lineWidth = 0.5
+        tab.stroke()
+
+        let inset = entry.rect.insetBy(dx: 6, dy: 0)
+        let iconSize = min(14, entry.rect.height - 6)
+        var textX = inset.minX
+        if let icon = entry.icon, inset.width > iconSize * 2 {
+            let iconRect = NSRect(x: inset.minX, y: entry.rect.midY - iconSize / 2, width: iconSize, height: iconSize)
+            icon.draw(in: iconRect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+            textX = iconRect.maxX + 5
+        }
+        let style = NSMutableParagraphStyle()
+        style.lineBreakMode = .byTruncatingTail
+        let textColor = entry.isTop ? NSColor.white : NSColor(white: 1, alpha: 0.7)
+        let text = NSAttributedString(string: entry.label, attributes: [
+            .font: NSFont.systemFont(ofSize: 11, weight: entry.isTop ? .semibold : .regular),
+            .foregroundColor: textColor,
+            .paragraphStyle: style,
+        ])
+        let height = text.size().height
+        let textRect = NSRect(x: textX, y: entry.rect.midY - height / 2, width: inset.maxX - textX, height: height)
+        if textRect
+            .width > 8 { text.draw(with: textRect, options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine]) }
+    }
+
+    private func entry(at event: NSEvent) -> Entry? {
+        let point = convert(event.locationInWindow, from: nil)
+        return entries.first { $0.rect.insetBy(dx: -2, dy: -2).contains(point) }
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        if let entry = entry(at: event) { focus(entry.windowID) }
+    }
+
+    /// A middle click closes the window, as on a browser's (and i3's) tabs.
+    override func otherMouseUp(with event: NSEvent) {
+        if event.buttonNumber == 2, let entry = entry(at: event) { close(entry.windowID) }
     }
 }

@@ -201,3 +201,54 @@ struct RoomKeeperTests {
         #expect(total == 12)
     }
 }
+
+struct TabsTests {
+    @Test func outsideTheyShareTheWholeWidth() throws {
+        let stack = try Fixtures.snapshot().stacks[0]
+        let layout = IndicatorLayout(stack: stack, top: 102, side: .top, outside: true, style: .tabs)
+        #expect(layout.bounds == Frame(x: 8, y: 16, w: 852, h: 22))
+        let widths = layout.items.map(\.frame.w)
+        #expect(widths.allSatisfy { abs($0 - 848.0 / 3) < 0.01 })
+        #expect(layout.items[2].frame.x + layout.items[2].frame.w == 852)
+        #expect(layout.items.map(\.isTop) == [false, true, false])
+    }
+
+    @Test func insideTheyLeaveTheTitleBarButtons() throws {
+        let stack = try Fixtures.snapshot().stacks[0]
+        let layout = IndicatorLayout(stack: stack, top: nil, side: .top, outside: false, style: .tabs)
+        #expect(layout.bounds.x == 86)
+        #expect(layout.bounds.y == 44)
+        #expect(abs(layout.bounds.w - 771) < 0.01)
+    }
+
+    @Test func onlyTopOrBottom() {
+        let frame = Frame(x: 0, y: 0, w: 100, h: 100)
+        #expect(Side(.left, frame: frame, display: nil, style: .tabs) == .top)
+        #expect(Side(.edges, frame: frame, display: nil, style: .tabs) == .top)
+        #expect(Side(.bottom, frame: frame, display: nil, style: .tabs) == .bottom)
+    }
+
+    @Test func turnToTheBottomButNeverASide() throws {
+        var snapshot = try Fixtures.snapshot()
+        // A window above the stack: its top faces a window, its bottom the screen.
+        var above = snapshot.windows.first { $0.id == 104 }!
+        above.id = 950
+        above.frame = Frame(x: 8, y: -600, w: 852, h: 600)
+        snapshot.windows.append(above)
+        snapshot.spaces[0].windows.append(950)
+        let stack = snapshot.stacks[0]
+        let bottom = StackPlacement.resolve(stack, in: snapshot, placement: .top, room: .widenGap, style: .tabs)
+        #expect(bottom == StackPlacement(side: .bottom, outside: true, meetsScreen: true))
+
+        var below = above
+        below.id = 951
+        below.frame = Frame(x: 8, y: 1200, w: 852, h: 300)
+        snapshot.windows.append(below)
+        snapshot.spaces[0].windows.append(951)
+        // Boxed in above and below; the open left side is no use to tabs.
+        let boxed = StackPlacement.resolve(
+            snapshot.stacks[0], in: snapshot, placement: .top, room: .paddingOnly, style: .tabs
+        )
+        #expect(boxed == StackPlacement(side: .top, outside: false, meetsScreen: false))
+    }
+}

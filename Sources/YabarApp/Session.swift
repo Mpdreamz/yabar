@@ -101,6 +101,14 @@ final class Session {
         }
     }
 
+    func close(window id: Int) {
+        Task { [yabai, log] in
+            do { try await yabai.close(window: id) } catch {
+                log.error("close window \(id): \(String(describing: error), privacy: .public)")
+            }
+        }
+    }
+
     /// Focuses a space through yabai, which needs its scripting addition. Without it, focusing a window on that space
     /// makes macOS switch there, so that is tried next; an empty space is then out of reach.
     func focus(space index: Int) {
