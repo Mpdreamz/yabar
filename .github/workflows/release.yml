@@ -151,12 +151,15 @@ jobs:
             "https://github.com/sparkle-project/Sparkle/releases/download/$version/Sparkle-$version.tar.xz"
           echo "$sha256  $tools/sparkle.tar.xz" | shasum -a 256 -c -
           tar -xf "$tools/sparkle.tar.xz" -C "$tools" ./bin/sign_update
+          echo "appcast: sign_update unpacked"
           # The key must be the one installed copies trust: its public half is Info.plist's SUPublicEDKey. A mismatch
           # would ship a release whose own updates it refuses. (generate_keys -x writes the 32-byte seed; older keys
           # carry the public key as their last 32 bytes.)
           openssl="$(brew --prefix openssl@3)/bin/openssl"
+          echo "appcast: openssl is $openssl ($([ -x "$openssl" ] && "$openssl" version || echo missing))"
           raw="$RUNNER_TEMP/key.raw"
           base64 -d <<<"$SPARKLE_PRIVATE_KEY" >"$raw"
+          echo "appcast: key decoded, $(wc -c <"$raw" | tr -d ' ') bytes"
           if [ "$(wc -c <"$raw" | tr -d ' ')" = 96 ]; then
             derived="$(tail -c 32 "$raw" | base64)"
           else
@@ -164,6 +167,7 @@ jobs:
               | "$openssl" pkey -inform DER -pubout -outform DER | tail -c 32 | base64)"
           fi
           rm -f "$raw"
+          echo "appcast: public key derived (${#derived} characters)"
           trusted="$(plutil -extract SUPublicEDKey raw build/Yabar.app/Contents/Info.plist)"
           [ -n "$derived" ] && [ "$derived" = "$trusted" ] \
             || { echo "SPARKLE_PRIVATE_KEY does not match SUPublicEDKey ($trusted) in Info.plist" >&2; exit 1; }
