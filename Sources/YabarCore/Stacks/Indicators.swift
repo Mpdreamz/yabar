@@ -1,6 +1,6 @@
-/// Where a stack's indicators go, stackline style: one per window, in stack order, along one side of the stack. With
-/// room made for them (`Room`), they sit just outside the stack's frame, in the padding or the gap yabai leaves
-/// there; without, just inside it. Everything is in yabai's coordinates.
+/// Where a stack's indicators go, stackline style: one per window, in stack order, along one side of the stack
+/// (`StackPlacement` picks it). With room made for them (`Room`), they sit just outside the stack's frame, in the
+/// padding or the gap yabai leaves there; without, just inside it. Everything is in yabai's coordinates.
 public enum IndicatorStyle: String, CaseIterable, Sendable {
     /// The app's icon on a rounded tile.
     case icons
@@ -78,11 +78,10 @@ public struct IndicatorLayout: Equatable, Sendable {
     public static let titleBarClearance = (down: 36.0, across: 78.0)
 
     public init(
-        stack: Stack, top: Int?, display: Frame?, style: IndicatorStyle, placement: IndicatorPlacement = .edges,
-        outside: Bool = false, metrics: IndicatorMetrics = .init()
+        stack: Stack, top: Int?, side: Side, outside: Bool, style: IndicatorStyle, metrics: IndicatorMetrics = .init()
     ) {
         let frame = stack.frame
-        side = Side(placement, frame: frame, display: display)
+        self.side = side
         let depth = metrics.depth(style)
         let count = Double(stack.windows.count)
 

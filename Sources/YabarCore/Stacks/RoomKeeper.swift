@@ -11,10 +11,11 @@ public actor RoomKeeper {
         self.yabai = yabai
     }
 
-    /// `depth` nil: make no room anywhere.
-    public func update(_ snapshot: Snapshot, placement: IndicatorPlacement, depth: Double?) async {
+    /// `mode` off: make no room anywhere.
+    public func update(_ snapshot: Snapshot, placement: IndicatorPlacement, mode: RoomMode, depth: Double) async {
         guard let base = await loadBase() else { return }
-        let needed = depth.map { Room.needed(snapshot, placement: placement, depth: $0, base: base) } ?? [:]
+        let needed = mode == .off
+            ? [:] : Room.needed(snapshot, placement: placement, mode: mode, depth: depth, base: base)
         for id in Set(needed.keys).union(applied.keys) {
             let target = needed[id] ?? base
             guard applied[id] ?? base != target else { continue }

@@ -53,8 +53,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func makeRoom() {
         guard let snapshot = session.snapshot else { return }
         let placement = Preferences.indicatorPlacement
+        let mode = Preferences.roomMode
         let depth = Preferences.roomDepth
-        Task { await room.update(snapshot, placement: placement, depth: depth) }
+        Task { await room.update(snapshot, placement: placement, mode: mode, depth: depth) }
     }
 
     private func indicatorsChanged() {
@@ -120,6 +121,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func indicatorMenu() -> NSMenuItem {
         let item = NSMenuItem(title: "Stack Indicators", action: nil, keyEquivalent: "")
         let submenu = NSMenu()
+        submenu.autoenablesItems = false
         for (style, title) in [(IndicatorStyle.icons, "Icons"), (.pills, "Pills"), (.off, "Off")] {
             let entry = NSMenuItem(title: title, action: #selector(chooseIndicatorStyle(_:)), keyEquivalent: "")
             entry.target = self
@@ -141,6 +143,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         submenu.addItem(.separator())
         submenu.addItem(toggle("Make Room in yabai", on: Preferences.makeRoom, action: #selector(toggleMakeRoom)))
+        let boxedIn = toggle(
+            "Widen the Gap for Boxed-In Stacks", on: Preferences.widenGapWhenBoxedIn, action: #selector(toggleBoxedIn)
+        )
+        boxedIn.indentationLevel = 1
+        boxedIn.isEnabled = Preferences.makeRoom
+        submenu.addItem(boxedIn)
         item.submenu = submenu
         return item
     }
@@ -155,6 +163,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let raw = item.representedObject as? String,
               let placement = IndicatorPlacement(rawValue: raw) else { return }
         Preferences.indicatorPlacement = placement
+        indicatorsChanged()
+    }
+
+    @objc private func toggleBoxedIn() {
+        Preferences.widenGapWhenBoxedIn.toggle()
         indicatorsChanged()
     }
 

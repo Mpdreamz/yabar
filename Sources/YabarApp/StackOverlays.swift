@@ -43,10 +43,11 @@ final class StackOverlays {
             panels.removeValue(forKey: stack.id)?.close()
             return
         }
-        let display = snapshot.displays.first { $0.index == stack.windows[0].display }?.frame
+        let placement = StackPlacement.resolve(
+            stack, in: snapshot, placement: Preferences.indicatorPlacement, room: Preferences.roomMode
+        )
         let layout = IndicatorLayout(
-            stack: stack, top: tops.top(of: stack.id), display: display, style: style,
-            placement: Preferences.indicatorPlacement, outside: Preferences.makeRoom
+            stack: stack, top: tops.top(of: stack.id), side: placement.side, outside: placement.outside, style: style
         )
         let panel = panels[stack.id] ?? IndicatorPanel(focus: focus)
         panels[stack.id] = panel
