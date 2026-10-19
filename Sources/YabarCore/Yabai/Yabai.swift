@@ -55,6 +55,17 @@ public struct Yabai: Sendable {
         }
     }
 
+    /// Whether yabai still has every signal Yabar added. A yabai that restarted has none, and nothing would tell Yabar.
+    public func hasSignals() async throws(YabaiError) -> Bool {
+        struct Entry: Decodable { let label: String }
+        let data = try await socket.send(["signal", "--list"])
+        guard let entries = try? JSONDecoder().decode([Entry].self, from: data) else {
+            throw .io("signal --list: unexpected reply")
+        }
+        let labels = Set(entries.map(\.label))
+        return Signals.events.allSatisfy { labels.contains(Signals.labelPrefix + $0) }
+    }
+
     /// Best effort: a signal yabai no longer has is not an error worth stopping for.
     public func removeSignals() async {
         for event in Signals.events {

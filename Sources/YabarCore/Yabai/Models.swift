@@ -78,6 +78,22 @@ public struct Space: Codable, Hashable, Sendable, Identifiable {
     public static let queryProperties =
         "id,uuid,index,label,type,display,windows,has-focus,is-visible,is-native-fullscreen"
 
+    public init(
+        id: UInt64, uuid: String, index: Int, label: String, type: Layout, display: Int, windows: [Int],
+        hasFocus: Bool, isVisible: Bool, isNativeFullscreen: Bool
+    ) {
+        self.id = id
+        self.uuid = uuid
+        self.index = index
+        self.label = label
+        self.type = type
+        self.display = display
+        self.windows = windows
+        self.hasFocus = hasFocus
+        self.isVisible = isVisible
+        self.isNativeFullscreen = isNativeFullscreen
+    }
+
     enum CodingKeys: String, CodingKey {
         case id, uuid, index, label, type, display, windows
         case hasFocus = "has-focus"

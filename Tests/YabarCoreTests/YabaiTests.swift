@@ -158,6 +158,16 @@ struct SocketTests {
         }
     }
 
+    @Test func noticesMissingSignals() async throws {
+        let all = Signals.events.map { "{\"label\":\"yabar-\($0)\"}" }
+        let fake = try FakeYabai { _ in Data(("[" + all.joined(separator: ",") + "]").utf8) }
+        defer { fake.stop() }
+        #expect(try await Yabai(socket: YabaiSocket(path: fake.path)).hasSignals())
+        let some = try FakeYabai { _ in Data("[{\"label\":\"yabar-space_changed\"},{\"label\":\"\"}]".utf8) }
+        defer { some.stop() }
+        #expect(try await !Yabai(socket: YabaiSocket(path: some.path)).hasSignals())
+    }
+
     @Test func signalsAreAddedAndRemoved() async throws {
         let fake = try FakeYabai { _ in Data() }
         defer { fake.stop() }
