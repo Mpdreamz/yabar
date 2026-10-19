@@ -25,15 +25,17 @@ public struct StackPlacement: Equatable, Sendable {
     }
 
     public static func resolve(
-        _ stack: Stack, in snapshot: Snapshot, placement: IndicatorPlacement, room: RoomMode
+        _ stack: Stack, in snapshot: Snapshot, placement: IndicatorPlacement, room: RoomMode,
+        style: IndicatorStyle = .icons
     ) -> StackPlacement {
         let display = snapshot.displays.first { $0.index == stack.windows[0].display }?.frame
-        let asked = Side(placement, frame: stack.frame, display: display)
+        let asked = Side(placement, frame: stack.frame, display: display, style: style)
         guard room != .off else { return StackPlacement(side: asked, outside: false, meetsScreen: false) }
         let others = snapshot.windows(onSpace: stack.spaceIndex)
             .filter { window in !window.isFloating && !stack.windows.contains { $0.id == window.id } }
             .map(\.frame)
-        if let side = asked.preference.first(where: { Room.meetsScreen(stack.frame, side: $0, others: others) }) {
+        let candidates = asked.preference.filter { !style.runsAcrossOnly || !$0.isVertical }
+        if let side = candidates.first(where: { Room.meetsScreen(stack.frame, side: $0, others: others) }) {
             return StackPlacement(side: side, outside: true, meetsScreen: true)
         }
         return StackPlacement(side: asked, outside: room == .widenGap, meetsScreen: false)

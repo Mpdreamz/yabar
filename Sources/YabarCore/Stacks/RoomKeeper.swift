@@ -12,10 +12,13 @@ public actor RoomKeeper {
     }
 
     /// `mode` off: make no room anywhere.
-    public func update(_ snapshot: Snapshot, placement: IndicatorPlacement, mode: RoomMode, depth: Double) async {
+    public func update(
+        _ snapshot: Snapshot, placement: IndicatorPlacement, mode: RoomMode, depth: Double,
+        style: IndicatorStyle = .icons
+    ) async {
         guard let base = await loadBase() else { return }
         let needed = mode == .off
-            ? [:] : Room.needed(snapshot, placement: placement, mode: mode, depth: depth, base: base)
+            ? [:] : Room.needed(snapshot, placement: placement, mode: mode, depth: depth, base: base, style: style)
         for id in Set(needed.keys).union(applied.keys) {
             let target = needed[id] ?? base
             guard applied[id] ?? base != target else { continue }

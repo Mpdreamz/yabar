@@ -15,7 +15,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menu: { [unowned self] in makeMenu() },
             focusSpace: { [unowned self] in session.focus(space: $0) }
         )
-        overlays = StackOverlays { [unowned self] in session.focus(window: $0) }
+        overlays = StackOverlays(
+            focus: { [unowned self] in session.focus(window: $0) },
+            close: { [unowned self] in session.close(window: $0) }
+        )
         session.onChange = { [weak self] changes in
             guard let self else { return }
             if changes.spaces { drawSpaces() }
@@ -55,7 +58,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let placement = Preferences.indicatorPlacement
         let mode = Preferences.roomMode
         let depth = Preferences.roomDepth
-        Task { await room.update(snapshot, placement: placement, mode: mode, depth: depth) }
+        let style = Preferences.indicatorStyle
+        Task { await room.update(snapshot, placement: placement, mode: mode, depth: depth, style: style) }
     }
 
     private func indicatorsChanged() {
@@ -122,7 +126,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let item = NSMenuItem(title: "Stack Indicators", action: nil, keyEquivalent: "")
         let submenu = NSMenu()
         submenu.autoenablesItems = false
-        for (style, title) in [(IndicatorStyle.icons, "Icons"), (.pills, "Pills"), (.off, "Off")] {
+        let styles: [(IndicatorStyle, String)] = [
+            (.icons, "Icons"),
+            (.pills, "Pills"),
+            (.tabs, "Tabs (i3)"),
+            (.off, "Off"),
+        ]
+        for (style, title) in styles {
             let entry = NSMenuItem(title: title, action: #selector(chooseIndicatorStyle(_:)), keyEquivalent: "")
             entry.target = self
             entry.representedObject = style.rawValue
