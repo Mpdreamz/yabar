@@ -13,7 +13,8 @@
    click to focus.
 5. **Stack indicators, i3 tabbed.** A tab strip (icon and title) along the top of each stack. Two placements: over the
    stacked window's title bar, or in reserved room by raising the space's top padding while it holds a stack.
-6. **Settings and polish.** Style and placement, per-display layout, launch at login (`SMAppService`).
+6. **Settings and polish.** A settings window (menu bar, stack indicators, login and updates), launch at login
+   (`SMAppService`).
 
 ## What yabai offers (v7.1)
 
