@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Quitting: nothing is redrawn or made room for any more.
     private var terminating = false
     private let settings = SettingsWindow()
+    private var labels = Preferences.spaceLabels
     private var drawnSettings = Preferences.signature
 
     func applicationDidFinishLaunching(_: Notification) {
@@ -26,7 +27,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         session.onChange = { [weak self] changes in
             guard let self else { return }
-            if changes.spaces { drawSpaces() }
+            if changes.spaces {
+                drawSpaces()
+                keepLabels()
+            }
             overlays?.apply(changes, in: session.snapshot)
             if !changes.added.isEmpty || !changes.removed.isEmpty || changes.spaces { makeRoom() }
         }
@@ -65,6 +69,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func drawSpaces() {
         spacesBar?.draw(session.spaces)
+    }
+
+    /// Adopts labels yabai has (from .yabairc, say) and puts back those it lost by restarting.
+    private func keepLabels() {
+        guard !terminating, let snapshot = session.snapshot else { return }
+        let commands = labels.reconcile(snapshot)
+        if labels != Preferences.spaceLabels { Preferences.spaceLabels = labels }
+        guard !commands.isEmpty else { return }
+        run(commands)
+    }
+
+    private func run(_ commands: [[String]]) {
+        Task { [session] in
+            for command in commands {
+                _ = try? await session.yabai.run(command)
+            }
+            session.refresh()
+        }
     }
 
     /// Has yabai leave room beside the stacks for their indicators, or take it back.
@@ -116,6 +138,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menu.addItem(disabled(yabaiStatus))
         }
         menu.addItem(.separator())
+        if let space = session.snapshot?.focusedSpace {
+            let label = NSMenuItem(
+                title: "Label Space \(space.index)…", action: #selector(labelFocusedSpace), keyEquivalent: ""
+            )
+            label.target = self
+            menu.addItem(label)
+        }
         menu.addItem(indicatorMenu())
         let settingsItem = NSMenuItem(title: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
         settingsItem.target = self
@@ -238,6 +267,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func focusWindow(_ item: NSMenuItem) {
         session.focus(window: item.tag)
+    }
+
+    /// Asks for a label for the focused space; empty clears it. yabai's rules are checked first, so its refusal is
+    /// explained instead of silently ignored.
+    @objc private func labelFocusedSpace() {
+        guard let snapshot = session.snapshot, let space = snapshot.focusedSpace else { return }
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
+        field.stringValue = space.label
+        field.placeholderString = "e.g. code, web, chat"
+        var problem: String?
+        // Coming forward for the dialog takes focus from the app you were in; it goes back there afterwards.
+        let previous = NSWorkspace.shared.frontmostApplication
+        defer { if previous?.processIdentifier != ProcessInfo.processInfo.processIdentifier { previous?.activate() } }
+        repeat {
+            let alert = NSAlert()
+            alert.messageText = "Label Space \(space.index)"
+            alert.informativeText = problem
+                ?? "Shown in the menu bar instead of the number, and usable as a yabai space selector. Empty clears it."
+            alert.accessoryView = field
+            alert.addButton(withTitle: "Label")
+            alert.addButton(withTitle: "Cancel")
+            alert.window.initialFirstResponder = field
+            NSApp.activate()
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+            let label = field.stringValue.trimmingCharacters(in: .whitespaces)
+            problem = SpaceLabels.problem(with: label, for: space, in: snapshot)
+            if problem == nil, let command = labels.set(label, for: space, in: snapshot) {
+                Preferences.spaceLabels = labels
+                run([command])
+            }
+        } while problem != nil
     }
 
     @objc private func showSettings() {
