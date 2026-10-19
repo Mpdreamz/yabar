@@ -1,0 +1,35 @@
+[tools]
+swiftformat = "0.58"
+swiftlint = "0.61"
+
+[env]
+BUILD_DIR = "{{config_root}}/build"
+
+[tasks.build]
+description = "Debug build, assemble build/Yabar.app, then copy it to YABAR_DEPLOY_DIR if set"
+run = ["swift build", "scripts/bundle.sh debug", "scripts/deploy.sh"]
+
+[tasks.dev]
+description = "Build and launch Yabar.app"
+depends = ["build"]
+run = "open $BUILD_DIR/Yabar.app"
+
+[tasks.test]
+description = "Swift Testing suite"
+run = "swift test --quiet"
+
+[tasks.fmt]
+description = "Format Swift sources"
+run = "swiftformat Sources Tests Package.swift"
+
+[tasks.lint]
+description = "Check formatting and lint"
+run = ["swiftformat Sources Tests Package.swift --lint", "swiftlint lint --quiet Sources Tests"]
+
+[tasks.bundle]
+description = "Release build, ad-hoc signed build/Yabar.app"
+run = ["swift build -c release", "scripts/bundle.sh release"]
+
+[tasks.deploy]
+description = "Copy build/Yabar.app to YABAR_DEPLOY_DIR (set it in mise.local.toml)"
+run = "scripts/deploy.sh"
