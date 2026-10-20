@@ -16,6 +16,7 @@ enum Preferences {
         static let indicatorPlacement = "indicatorPlacement"
         static let spaceLabels = "spaceLabels"
         static let profiles = "profiles"
+        static let scratchpads = "scratchpads"
         /// Spaces whose padding or gap Yabar changed and has not put back yet (space ids).
         static let roomSpaces = "roomSpaces"
     }
@@ -59,6 +60,12 @@ enum Preferences {
         set { defaults.set(try? JSONEncoder().encode(newValue), forKey: Key.profiles) }
     }
 
+    /// yabai scratchpads (`Scratchpad`), which need its scripting addition.
+    static var scratchpads: [Scratchpad] {
+        get { Scratchpads.stored(in: defaults) }
+        set { defaults.set(try? JSONEncoder().encode(newValue), forKey: Key.scratchpads) }
+    }
+
     /// Everything that decides what Yabar keeps each space at, for this snapshot's displays.
     static func plan(for snapshot: Snapshot) -> SpacePlan {
         SpacePlan.stored(in: defaults, snapshot: snapshot)
@@ -98,6 +105,7 @@ enum Preferences {
             "\(showLabels)", "\(showAttention)", "\(hideEmptySpaces)", "\(itemPerDisplay)", indicatorStyle.rawValue,
             indicatorPlacement.rawValue,
             String(decoding: (try? JSONEncoder().encode(profiles)) ?? Data(), as: UTF8.self),
+            String(decoding: (try? JSONEncoder().encode(scratchpads)) ?? Data(), as: UTF8.self),
         ].joined(separator: "|")
     }
 }

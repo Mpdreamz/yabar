@@ -104,6 +104,7 @@ enum Fixtures {
         \t"pid":\(id * 10),
         \t"app":"\(app)",
         \t"title":"\(title)",
+        \t"scratchpad":"",
         \t"frame":{
         \t\t"x":\(String(format: "%.4f", frame.0)),
         \t\t"y":\(String(format: "%.4f", frame.1)),

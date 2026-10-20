@@ -12,11 +12,12 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     private var previous: NSRunningApplication?
 
     /// Opens (or brings forward) the window; `scopes` are the displays and labelled spaces profiles can be set for.
-    func show(scopes: [ProfileScope]) {
+    func show(scopes: [ProfileScope], scriptingAddition: Bool) {
+        let view = SettingsView(scopes: scopes, scriptingAddition: scriptingAddition)
         if let window {
-            window.contentViewController = NSHostingController(rootView: SettingsView(scopes: scopes))
+            window.contentViewController = NSHostingController(rootView: view)
         } else {
-            let window = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(scopes: scopes)))
+            let window = NSWindow(contentViewController: NSHostingController(rootView: view))
             window.title = "Yabar Settings"
             window.styleMask = [.titled, .closable]
             window.isReleasedWhenClosed = false
@@ -39,6 +40,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
 
 private struct SettingsView: View {
     let scopes: [ProfileScope]
+    let scriptingAddition: Bool
     @AppStorage(Preferences.Key.showLabels) private var showLabels = true
     @AppStorage(Preferences.Key.showAttention) private var showAttention = true
     @AppStorage(Preferences.Key.hideEmptySpaces) private var hideEmptySpaces = false
@@ -96,6 +98,7 @@ private struct SettingsView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             ProfilesSection(scopes: scopes)
+            ScratchpadsSection(available: scriptingAddition)
             Section("Yabar") {
                 Toggle("Open at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, on in

@@ -38,3 +38,13 @@ Settings → Displays & Spaces sets a layout, padding, gap, stack indicator styl
 built-in displays, external displays, one display, or one labelled space (Label This Space… in the menu). With a
 maximum, a new window that would make one tile too many goes into a stack on the tile that had focus. Yabar keeps all
 of this as per-space settings in yabai and puts .yabairc's values back when it quits.
+
+## Scratchpads
+
+yabai's own scratchpads, which need its scripting addition (without it the feature is off). In Settings → Scratchpads,
+name one and give its app (and, for an app with many windows, a title to match) and a place on yabai's grid; a new
+window of that app becomes the scratchpad as it opens, or choose Make This Window a Scratchpad… in the menu. Then:
+
+```sh
+lcmd - t : yabar scratchpad term   # show or hide it; launches the app when it is not running
+```
