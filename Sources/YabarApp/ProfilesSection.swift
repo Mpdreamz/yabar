@@ -93,6 +93,19 @@ struct ProfilesSection: View {
             }
             LabeledContent("Gap") { number("gap", \.gap) }
             LabeledContent("Max tiles") { count("none", \.maxTiles) }
+            LabeledContent("Columns") { count("spiral", \.columns) }
+            Picker("Beyond the columns", selection: overflow) {
+                Text("Inherit").tag(SpaceSettings.Overflow?.none)
+                Text("Rows").tag(SpaceSettings.Overflow?.some(.rows))
+                Text("Stack").tag(SpaceSettings.Overflow?.some(.stack))
+            }
+            Picker("Focus sizing", selection: focusShare) {
+                Text("Inherit").tag(Double?.none)
+                Text("Off").tag(Double?.some(0))
+                Text("Golden ratio (0.62)").tag(Double?.some(SpaceSettings.golden))
+                Text("Half (0.5)").tag(Double?.some(0.5))
+                Text("Two thirds (0.67)").tag(Double?.some(0.67))
+            }
             Picker("Stack indicators", selection: style) {
                 Text("Inherit").tag(IndicatorStyle?.none)
                 Text("Icons").tag(IndicatorStyle?.some(.icons))
@@ -106,7 +119,7 @@ struct ProfilesSection: View {
             Text("Settings for a display kind, one display, or a labelled space, from broad to specific; anything left "
                 + "empty (inherit) comes from the broader one, and in the end from .yabairc. Room for stack indicators is added "
                 +
-                "on top. With max tiles, a new window beyond it goes into a stack on the focused tile. Everything goes back to .yabairc's values when Yabar quits.")
+                "on top. With max tiles, a new window beyond it goes into a stack on the focused tile. Columns lay new windows side by side; beyond them a window becomes a row under the focused tile, or joins its stack. Focus sizing gives the focused tile that share of the width and of its column. Everything goes back to .yabairc's values when Yabar quits.")
                 .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -125,6 +138,14 @@ struct ProfilesSection: View {
                 }
             }
         )
+    }
+
+    private var overflow: Binding<SpaceSettings.Overflow?> {
+        Binding(get: { profiles[scope].overflow }, set: { profiles[scope].overflow = $0 })
+    }
+
+    private var focusShare: Binding<Double?> {
+        Binding(get: { profiles[scope].focusShare }, set: { profiles[scope].focusShare = $0 })
     }
 
     private var style: Binding<IndicatorStyle?> {

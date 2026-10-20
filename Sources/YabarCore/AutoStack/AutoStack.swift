@@ -36,7 +36,7 @@ public enum AutoStack {
 
     /// A window of the tile to stack onto: the one focused before (if it is on this space and still a tile), else the
     /// largest tile's first window.
-    private static func target(for space: Space, among tiles: [[Window]], before old: Snapshot) -> Int? {
+    static func target(for space: Space, among tiles: [[Window]], before old: Snapshot) -> Int? {
         if let focused = old.windows.first(where: \.hasFocus), focused.space == space.index,
            tiles.contains(where: { $0.contains { $0.id == focused.id } })
         {

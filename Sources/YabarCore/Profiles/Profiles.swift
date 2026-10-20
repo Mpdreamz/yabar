@@ -12,10 +12,30 @@ public struct SpaceSettings: Codable, Equatable, Sendable {
     public var indicatorStyle: IndicatorStyle?
     /// At most this many tiles: a new window beyond it goes into a stack (`AutoStack`).
     public var maxTiles: Int?
+    /// Windows side by side in this many columns, instead of yabai's spiral (`Columns`).
+    public var columns: Int?
+    /// What a window beyond the columns becomes: a row in the focused column, or part of its stack.
+    public var overflow: Overflow?
+    /// The share of the width (and of its column's height) the focused tile gets (`FocusSizing`); 0 turns it off
+    /// where a broader profile has it on, nil inherits.
+    public var focusShare: Double?
+
+    /// Focus sizing's share, when it is on.
+    public var activeFocusShare: Double? {
+        focusShare.flatMap { $0 > 0 && $0 < 1 ? $0 : nil }
+    }
+
+    public enum Overflow: String, Codable, Equatable, Sendable {
+        case rows, stack
+    }
+
+    /// The golden ratio's share: what focus sizing defaults to.
+    public static let golden = 0.618
 
     public init(
         layout: Space.Layout? = nil, top: Double? = nil, bottom: Double? = nil, left: Double? = nil,
-        right: Double? = nil, gap: Double? = nil, indicatorStyle: IndicatorStyle? = nil, maxTiles: Int? = nil
+        right: Double? = nil, gap: Double? = nil, indicatorStyle: IndicatorStyle? = nil, maxTiles: Int? = nil,
+        columns: Int? = nil, overflow: Overflow? = nil, focusShare: Double? = nil
     ) {
         self.layout = layout
         self.top = top
@@ -25,6 +45,14 @@ public struct SpaceSettings: Codable, Equatable, Sendable {
         self.gap = gap
         self.indicatorStyle = indicatorStyle
         self.maxTiles = maxTiles
+        self.columns = columns
+        self.overflow = overflow
+        self.focusShare = focusShare
+    }
+
+    /// The most tiles before new windows go into stacks: the limit set, or the columns when they overflow into stacks.
+    public var stackLimit: Int? {
+        maxTiles ?? ((overflow ?? .rows) == .stack ? columns : nil)
     }
 
     public var isEmpty: Bool {
@@ -36,7 +64,9 @@ public struct SpaceSettings: Codable, Equatable, Sendable {
         SpaceSettings(
             layout: layout ?? broader.layout, top: top ?? broader.top, bottom: bottom ?? broader.bottom,
             left: left ?? broader.left, right: right ?? broader.right, gap: gap ?? broader.gap,
-            indicatorStyle: indicatorStyle ?? broader.indicatorStyle, maxTiles: maxTiles ?? broader.maxTiles
+            indicatorStyle: indicatorStyle ?? broader.indicatorStyle, maxTiles: maxTiles ?? broader.maxTiles,
+            columns: columns ?? broader.columns, overflow: overflow ?? broader.overflow,
+            focusShare: focusShare ?? broader.focusShare
         )
     }
 }
@@ -70,10 +100,16 @@ public struct Profiles: Codable, Equatable, Sendable {
 public struct SpaceTarget: Equatable, Sendable {
     public var room: Room
     public var layout: Space.Layout
+    /// yabai's `split_type` for the space: how a new window splits the focused one.
+    public var splitType: String
+    /// yabai's `auto_balance` for the space.
+    public var autoBalance: String
 
-    public init(room: Room, layout: Space.Layout) {
+    public init(room: Room, layout: Space.Layout, splitType: String = "auto", autoBalance: String = "off") {
         self.room = room
         self.layout = layout
+        self.splitType = splitType
+        self.autoBalance = autoBalance
     }
 
     /// yabai's commands to take a space from `current` to this.
@@ -81,6 +117,12 @@ public struct SpaceTarget: Equatable, Sendable {
         var commands: [[String]] = []
         if layout != current.layout { commands.append(["space", String(index), "--layout", layout.name]) }
         if room != current.room { commands += room.commands(space: index) }
+        if splitType != current.splitType {
+            commands.append(["config", "--space", String(index), "split_type", splitType])
+        }
+        if autoBalance != current.autoBalance {
+            commands.append(["config", "--space", String(index), "auto_balance", autoBalance])
+        }
         return commands
     }
 }
@@ -135,7 +177,14 @@ public struct SpacePlan: Equatable, Sendable {
                 left: settings.left ?? base.room.left, right: settings.right ?? base.room.right,
                 gap: settings.gap ?? base.room.gap
             )
-            targets[space.id] = SpaceTarget(room: room, layout: settings.layout ?? base.layout)
+            // Columns: new windows split the focused one sideways. Their widths are kept equal by yabai, unless focus
+            // sizing keeps them instead.
+            let splitType = settings.columns != nil ? "vertical" : base.splitType
+            let autoBalance = settings.activeFocusShare != nil ? "off" : settings.columns != nil ? "on" : base
+                .autoBalance
+            targets[space.id] = SpaceTarget(
+                room: room, layout: settings.layout ?? base.layout, splitType: splitType, autoBalance: autoBalance
+            )
         }
         // Room for each stack's indicators, on top of its space's own.
         for stack in snapshot.stacks {

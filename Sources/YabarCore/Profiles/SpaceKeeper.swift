@@ -30,7 +30,10 @@ public actor SpaceKeeper {
     /// What an earlier run left on a space: some padding and gap (rewritten), and the layout as yabai has it (left
     /// alone, since resetting a layout rebuilds the space).
     private static func unknown(_ base: SpaceTarget) -> SpaceTarget {
-        SpaceTarget(room: Room(top: -1, bottom: -1, left: -1, right: -1, gap: -1), layout: base.layout)
+        SpaceTarget(
+            room: Room(top: -1, bottom: -1, left: -1, right: -1, gap: -1), layout: base.layout,
+            splitType: "unknown", autoBalance: "unknown"
+        )
     }
 
     /// The spaces whose layout, padding or gap Yabar has changed, to remember until they are put back.
@@ -96,7 +99,8 @@ public actor SpaceKeeper {
         }
         guard let top = await number("top_padding"), let bottom = await number("bottom_padding"),
               let left = await number("left_padding"), let right = await number("right_padding"),
-              let gap = await number("window_gap"), let layout = await value("layout")
+              let gap = await number("window_gap"), let layout = await value("layout"),
+              let splitType = await value("split_type"), let autoBalance = await value("auto_balance")
         else { return nil }
         let parsed: Space.Layout = switch layout {
         case "bsp": .bsp
@@ -104,7 +108,10 @@ public actor SpaceKeeper {
         case "float": .float
         default: .other(layout)
         }
-        base = SpaceTarget(room: Room(top: top, bottom: bottom, left: left, right: right, gap: gap), layout: parsed)
+        base = SpaceTarget(
+            room: Room(top: top, bottom: bottom, left: left, right: right, gap: gap), layout: parsed,
+            splitType: splitType, autoBalance: autoBalance
+        )
         return base
     }
 }
