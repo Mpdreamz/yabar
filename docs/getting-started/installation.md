@@ -28,5 +28,5 @@ Yabar is for Apple Silicon Macs on macOS 15 or later. The cask also puts the `ya
 
 ## First launch
 
-Yabar opens at login from its first launch on; turn that off under Settings → Yabar. It updates itself
+Yabar opens at login from its first launch on; turn that off under Settings → General. It updates itself
 ([Updates](../reference/updates.md)). Only one Yabar runs at a time: a second copy says so and quits.

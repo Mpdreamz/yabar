@@ -77,6 +77,11 @@ public enum YabarCommand: String, Equatable, Sendable, CaseIterable {
         }
     }
 
+    /// It opens a window of Yabar's own, which then has focus.
+    public var opensWindow: Bool {
+        self == .settings || self == .labelSpace
+    }
+
     public var symbol: String {
         switch self {
         case .focusAttention: "bell.badge"

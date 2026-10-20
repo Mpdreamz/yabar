@@ -363,15 +363,16 @@ enum Shots {
 
     // MARK: Settings
 
-    /// The real settings window, with the scopes of a two-display setup.
+    /// The real settings window, every pane, with the scopes of a two-display setup.
     static func settings(into folder: URL) throws {
         let scopes: [ProfileScope] = [
             .builtIn, .external, .display(uuid: "A", name: "Built-in Retina Display"),
             .display(uuid: "B", name: "LG UltraFine"), .space(label: "code"), .space(label: "web"),
         ]
-        let view = SettingsSnapshot(scopes: scopes)
-        let image = try hosted(view, size: NSSize(width: 460, height: 1340))
-        try write(image, to: folder.appendingPathComponent("settings.png"))
+        for pane in SettingsPane.allCases {
+            let image = try hosted(SettingsSnapshot(scopes: scopes, pane: pane), size: NSSize(width: 720, height: 540))
+            try write(image, to: folder.appendingPathComponent("settings-\(pane.rawValue).png"))
+        }
     }
 
     // MARK: The social card
