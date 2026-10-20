@@ -128,6 +128,18 @@ struct RoomTests {
         #expect(rooms[8] == nil)
     }
 
+    /// Space 2's stack is as wide as the screen. The padding made on its left moves its centre right of the middle; the
+    /// side must not follow it there, or the next padding moves it back, and the windows never stop moving.
+    @Test func aScreenWideStackKeepsItsSideOnceThePaddingMovesIt() throws {
+        var snapshot = try Fixtures.snapshot()
+        #expect(Room.needed(snapshot, placement: .edges, depth: 30, base: base)[7] == Room(left: 30))
+        for index in snapshot.windows.indices where snapshot.windows[index].space == 2 {
+            snapshot.windows[index].frame.x += 30
+            snapshot.windows[index].frame.w -= 30
+        }
+        #expect(Room.needed(snapshot, placement: .edges, depth: 30, base: base)[7] == Room(left: 30))
+    }
+
     @Test func aStackFacingAWindowTurnsToTheScreen() throws {
         let rooms = try Room.needed(Fixtures.snapshot(), placement: .right, depth: 30, base: base)
         #expect(rooms[3] == Room(left: 30))
@@ -183,9 +195,13 @@ struct SpaceKeeperTests {
         await keeper.update(snapshot, plan: Self.plan())
         #expect(fake.messages.count(where: { $0.first == "space" }) == 6)
 
-        // Space 2's stack goes: it gets yabai's values back.
+        // Space 2's stack goes: once that has settled, it gets yabai's values back.
         snapshot.windows.removeAll { $0.space == 2 }
-        await keeper.update(snapshot, plan: Self.plan())
+        let gone = ContinuousClock.now
+        let pending = await keeper.update(snapshot, plan: Self.plan(), now: gone)
+        #expect(pending.recheck == .milliseconds(250))
+        #expect(fake.messages.count(where: { $0.first == "space" }) == 6)
+        await keeper.update(snapshot, plan: Self.plan(), now: gone + .milliseconds(250))
         #expect(fake.messages.suffix(2) == [
             ["space", "2", "--padding", "abs:0:0:0:0"],
             ["space", "2", "--gap", "abs:2"],
@@ -356,5 +372,72 @@ struct AttentionTests {
         let index = after.windows.firstIndex { $0.id == 104 }!
         after.windows[index].title = "(2) Inbox"
         #expect(Changes(from: before, to: after).spaces)
+    }
+}
+
+@Suite(.timeLimit(.minutes(1)))
+struct RoomSettlingTests {
+    let start = ContinuousClock.now
+    let none = Room()
+    let left = Room(left: 30)
+    let right = Room(right: 30)
+    let stacks = [[1, 2]]
+
+    func at(_ milliseconds: Int) -> ContinuousClock.Instant {
+        start + .milliseconds(milliseconds)
+    }
+
+    @Test func growsAtOnce() {
+        var settling = RoomSettling()
+        let decision = settling.room(space: 1, wanted: left, current: none, stacks: stacks, now: at(0))
+        #expect(decision == .init(room: left, recheck: nil, flapping: false))
+    }
+
+    @Test func shrinksOnceSettled() {
+        var settling = RoomSettling()
+        #expect(settling.room(space: 1, wanted: none, current: left, stacks: [], now: at(0))
+            == .init(room: left, recheck: .milliseconds(250), flapping: false))
+        #expect(settling.room(space: 1, wanted: none, current: left, stacks: [], now: at(100)).room == left)
+        #expect(settling.room(space: 1, wanted: none, current: left, stacks: [], now: at(250)).room == none)
+    }
+
+    /// A stack yabai reports apart for a moment, and back: the room does not move.
+    @Test func aFlickerMovesNothing() {
+        var settling = RoomSettling()
+        #expect(settling.room(space: 1, wanted: none, current: left, stacks: [], now: at(0)).room == left)
+        #expect(settling.room(space: 1, wanted: left, current: left, stacks: stacks, now: at(40)).room == left)
+        // The next time it goes, it waits its whole settle again.
+        #expect(settling.room(space: 1, wanted: none, current: left, stacks: [], now: at(300)).room == left)
+        #expect(settling.room(space: 1, wanted: none, current: left, stacks: [], now: at(549)).room == left)
+    }
+
+    /// Moving to the other side keeps the old side's room until the new one settles.
+    @Test func changingSidesAddsBeforeItTakesAway() {
+        var settling = RoomSettling()
+        let both = Room(left: 30, right: 30)
+        #expect(settling.room(space: 1, wanted: right, current: left, stacks: stacks, now: at(0)).room == both)
+        #expect(settling.room(space: 1, wanted: right, current: both, stacks: stacks, now: at(250)).room == right)
+    }
+
+    /// Room that keeps changing anyway stays at its largest until the space's stacks change.
+    @Test func aFlappingSpaceKeepsTheLargerRoom() {
+        var settling = RoomSettling()
+        var current = left
+        var flapped = false
+        var time = 0
+        for wanted in [right, right, left, left, right, right, left, left] {
+            let decision = settling.room(space: 1, wanted: wanted, current: current, stacks: stacks, now: at(time))
+            current = decision.room
+            flapped = flapped || decision.flapping
+            time += 260
+        }
+        #expect(flapped)
+        let both = Room(left: 30, right: 30)
+        #expect(current == both)
+        #expect(settling.room(space: 1, wanted: left, current: both, stacks: stacks, now: at(9000)).room == both)
+        // A window joins the stack: it is looked at afresh.
+        let decision = settling.room(space: 1, wanted: left, current: both, stacks: [[1, 2, 3]], now: at(9100))
+        #expect(decision.room == both)
+        #expect(decision.recheck == .milliseconds(250))
     }
 }

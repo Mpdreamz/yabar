@@ -46,7 +46,7 @@ enum Preferences {
     }
 
     static var indicatorStyle: IndicatorStyle {
-        get { defaults.string(forKey: Key.indicatorStyle).flatMap(IndicatorStyle.init(rawValue:)) ?? .icons }
+        get { defaults.string(forKey: Key.indicatorStyle).flatMap(IndicatorStyle.init(rawValue:)) ?? .standard }
         set { defaults.set(newValue.rawValue, forKey: Key.indicatorStyle) }
     }
 

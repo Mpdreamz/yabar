@@ -12,6 +12,9 @@ public enum IndicatorStyle: String, CaseIterable, Codable, Sendable {
     case tabs
     case off
 
+    /// What a new install draws: tabs run across the top, so they never need a side picked for them.
+    public static let standard = IndicatorStyle.tabs
+
     /// Tabs need a title's width, so they only run across the top or the bottom.
     public var runsAcrossOnly: Bool {
         self == .tabs
