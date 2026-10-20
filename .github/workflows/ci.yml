@@ -25,7 +25,10 @@ jobs:
       - name: Lint
         run: mise run lint
 
+      # A test waiting forever (a socket that never answers) fails it within the minute each suite allows; this is
+      # the backstop, well under the job's limit.
       - name: Test
+        timeout-minutes: 10
         run: mise run test
 
       - name: Release build

@@ -1,6 +1,7 @@
 import Testing
 @testable import YabarCore
 
+@Suite(.timeLimit(.minutes(1)))
 struct SpaceLabelTests {
     @Test func adoptsYabaisAndPutsBackWhatItLost() throws {
         var labels = SpaceLabels()

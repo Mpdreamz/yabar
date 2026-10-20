@@ -1,6 +1,7 @@
 import Testing
 @testable import YabarCore
 
+@Suite(.timeLimit(.minutes(1)))
 struct MenuBarTests {
     @Test func oneGroupPerDisplay() throws {
         let groups = try MenuBar.cells(Fixtures.snapshot())
@@ -37,6 +38,7 @@ struct MenuBarTests {
     }
 }
 
+@Suite(.timeLimit(.minutes(1)))
 struct SnapshotTests {
     @Test func leavesOutOneProcess() throws {
         let snapshot = try Fixtures.snapshot().excluding(pid: 1010)
@@ -53,6 +55,7 @@ struct SnapshotTests {
     }
 }
 
+@Suite(.timeLimit(.minutes(1)))
 struct NativeSpacesTests {
     /// The shape `CGSCopyManagedDisplaySpaces` returns.
     static var displays: [[String: Any]] { [

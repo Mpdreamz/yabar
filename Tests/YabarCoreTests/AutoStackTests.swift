@@ -1,6 +1,7 @@
 import Testing
 @testable import YabarCore
 
+@Suite(.timeLimit(.minutes(1)))
 struct AutoStackTests {
     /// Space 1 has two tiles (a stack of three and Mail); a new window splits it into three.
     func withNewWindow(_ id: Int = 900, space: Int = 1) throws -> (old: Snapshot, new: Snapshot) {
