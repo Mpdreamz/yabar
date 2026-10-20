@@ -1,4 +1,5 @@
 import AppKit
+import OSLog
 import YabarCore
 
 @MainActor
@@ -8,6 +9,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var spacesBar: SpacesBar?
     private var overlays: StackOverlays?
     private lazy var keeper = SpaceKeeper(yabai: session.yabai, leftover: Preferences.roomSpaces)
+    /// A look again at the room still settling (`SpaceKeeper`), when no signal comes first.
+    private var recheck: Task<Void, Never>?
+    private let log = Logger(subsystem: "io.github.mpdreamz.yabar", category: "room")
     private var signalSources: [DispatchSourceSignal] = []
     /// Quitting: nothing is redrawn or made room for any more.
     private var terminating = false
@@ -120,7 +124,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !terminating, let snapshot = session.snapshot else { return }
         let plan = Preferences.plan(for: snapshot)
         Task {
-            await keeper.update(snapshot, plan: plan)
+            let pending = await keeper.update(snapshot, plan: plan)
+            for index in pending.flapping {
+                log.notice("space \(index) flaps between room for its stacks and none; keeping the larger room")
+            }
+            recheck?.cancel()
+            recheck = pending.recheck.map { delay in
+                Task {
+                    try? await Task.sleep(for: delay)
+                    guard !Task.isCancelled else { return }
+                    makeRoom()
+                }
+            }
             // Kept so a Yabar that is killed before it can put things back has the next one do it.
             let changed = await keeper.changed
             if changed != Preferences.roomSpaces { Preferences.roomSpaces = changed }

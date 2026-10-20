@@ -21,7 +21,8 @@ while its stack has focus; the others are dimmed, more so when focus is elsewher
 
 Settings → Stacks → **Placement**:
 
-- **Screen edge side** (the default): left for a stack in the left half of its display, right otherwise.
+- **Screen edge side** (the default): the side where the stack meets the screen, read from its neighbours; for a stack
+  as wide as the screen, left; for one with windows on both sides, the nearer half of its display.
 - **Left**, **Right**, **Top** or **Bottom**.
 
 Tabs only run along the top or the bottom. Whatever you choose, a side that faces another window gives way to one that
