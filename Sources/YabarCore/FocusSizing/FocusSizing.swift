@@ -35,17 +35,22 @@ public enum FocusSizing {
             switch node {
             case let .leaf(tile): tile == focused ? weight : 1
             case let .split(vertical, first, second):
-                vertical ? across(first, weight) + across(second, weight) : max(
-                    across(first, weight),
-                    across(second, weight)
-                )
+                if vertical {
+                    across(first, weight) + across(second, weight)
+                } else {
+                    max(across(first, weight), across(second, weight))
+                }
             }
         }
         func down(_ node: TileTree, _ weight: Double) -> Double {
             switch node {
             case let .leaf(tile): tile == focused ? weight : 1
             case let .split(vertical, first, second):
-                vertical ? max(down(first, weight), down(second, weight)) : down(first, weight) + down(second, weight)
+                if vertical {
+                    max(down(first, weight), down(second, weight))
+                } else {
+                    down(first, weight) + down(second, weight)
+                }
             }
         }
         // The column the focused tile is in: what is below the last left | right line on its way down from the top.
