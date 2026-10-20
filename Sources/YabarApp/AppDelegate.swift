@@ -21,6 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_: Notification) {
         Updater.shared.start()
+        LaunchAtLogin.turnOnOnce(build: build, bundlePath: Bundle.main.bundlePath)
         spacesBar = SpacesBar(
             menu: { [unowned self] in makeMenu() },
             focusSpace: { [unowned self] in session.focus(space: $0) }
