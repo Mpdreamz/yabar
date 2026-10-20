@@ -61,7 +61,7 @@ public struct LauncherItem: Equatable, Sendable, Identifiable {
 /// Commands that are Yabar's own rather than yabai's.
 public enum YabarCommand: String, Equatable, Sendable, CaseIterable {
     case focusAttention, labelSpace, settings, indicatorsIcons, indicatorsPills, indicatorsTabs, indicatorsOff
-    case recoverScratchpads
+    case recoverScratchpads, arrangeColumns
 
     public var title: String {
         switch self {
@@ -73,6 +73,7 @@ public enum YabarCommand: String, Equatable, Sendable, CaseIterable {
         case .indicatorsTabs: "Stack indicators: tabs"
         case .indicatorsOff: "Stack indicators: off"
         case .recoverScratchpads: "Bring back all scratchpads"
+        case .arrangeColumns: "Re-arrange this space as columns"
         }
     }
 
@@ -83,6 +84,7 @@ public enum YabarCommand: String, Equatable, Sendable, CaseIterable {
         case .settings: "gearshape"
         case .indicatorsIcons, .indicatorsPills, .indicatorsTabs, .indicatorsOff: "square.stack.3d.up"
         case .recoverScratchpads: "rectangle.on.rectangle"
+        case .arrangeColumns: "rectangle.split.3x1"
         }
     }
 }

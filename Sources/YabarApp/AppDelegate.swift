@@ -100,11 +100,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// A new window on a space already at its profile's maximum of tiles goes into a stack (`AutoStack`).
+    /// A new window on a space already at its profile's maximum of tiles goes into a stack (`AutoStack`), or, beyond
+    /// its columns, becomes a row (`Columns`).
     private func autoStack(from old: Snapshot, to new: Snapshot) {
         guard !terminating else { return }
         let plan = Preferences.plan(for: new)
-        let commands = AutoStack.commands(from: old, to: new) { plan.settings(for: $0, in: new).maxTiles }
+        let commands = AutoStack.commands(from: old, to: new) { plan.settings(for: $0, in: new).stackLimit }
+            + Columns.commands(from: old, to: new) { plan.settings(for: $0, in: new) }
         if !commands.isEmpty { run(commands) }
     }
 
@@ -196,6 +198,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .indicatorsTabs: Preferences.indicatorStyle = .tabs
         case .indicatorsOff: Preferences.indicatorStyle = .off
         case .recoverScratchpads: recoverScratchpads()
+        case .arrangeColumns:
+            // The space's columns, or three when its profile sets none.
+            guard let snapshot = session.snapshot, let space = snapshot.focusedSpace else { return }
+            let columns = Preferences.plan(for: snapshot).settings(for: space, in: snapshot).columns ?? 3
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(150))
+                self?.run(Columns.arrange(space: space.index, in: snapshot, count: columns))
+            }
         }
     }
 
