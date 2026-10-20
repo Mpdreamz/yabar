@@ -26,16 +26,20 @@ final class FakeYabai: @unchecked Sendable {
         lock.withLock { received }
     }
 
+    /// Wakes the serving thread out of accept; it closes the socket itself. Closing it here, while the thread may still
+    /// be in accept, would free the descriptor number for another test's socket, which the thread would then serve.
     func stop() {
         shutdown(fd, SHUT_RDWR)
-        close(fd)
         unlink(path)
     }
 
     private func serve(_ fd: Int32) {
         while true {
             let client = accept(fd, nil, nil)
-            guard client >= 0 else { return }
+            guard client >= 0 else {
+                close(fd)
+                return
+            }
             // A client that gave up (its read timed out on a busy machine) must not take the test process down with
             // SIGPIPE when the reply is written.
             var on: Int32 = 1
@@ -46,6 +50,11 @@ final class FakeYabai: @unchecked Sendable {
                 let n = read(client, &chunk, chunk.count)
                 if n <= 0 { break }
                 data.append(chunk, count: n)
+            }
+            // A connection that sends nothing (the scripting addition check only connects) gets nothing back.
+            guard data.count >= 4 else {
+                close(client)
+                continue
             }
             let length = data.prefix(4).withUnsafeBytes { $0.loadUnaligned(as: Int32.self) }
             let body = data.dropFirst(4)
