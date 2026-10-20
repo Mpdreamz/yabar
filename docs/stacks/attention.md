@@ -15,4 +15,4 @@ Such a window gets a red badge on its icon or tab (the count, or a dot); a pill 
 in the menu bar, so you see it from any space. `yabar focus attention` goes to the next one, and the
 [launcher](../moving-around/launcher.md) shows them with a badge.
 
-Turn it off under Settings → Attention.
+Turn it off under Settings → Stacks.

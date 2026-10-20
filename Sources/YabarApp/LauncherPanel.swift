@@ -106,9 +106,12 @@ final class LauncherController: NSObject, NSWindowDelegate {
         usage.picked(item.usageKey)
         Preferences.launcherUsage = usage
         // Focus goes back first: yabai acts on the focused window, which must not be the launcher.
+        // Focus stays away from the app you were in when what runs takes it: a window, an app, or one of Yabar's
+        // own windows (settings, the label dialog), which would otherwise lose a race with the app getting it back.
         let takesFocus: Bool = switch item.action {
         case .focus, .open: true
-        case .yabai, .yabar: newCopy
+        case let .yabar(command): command.opensWindow || newCopy
+        case .yabai: newCopy
         }
         close(returningFocus: !takesFocus)
         perform?(item.action, newCopy)

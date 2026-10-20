@@ -38,21 +38,56 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     }
 }
 
-/// The settings as the docs show them (`Shots`): the window's form, with the scripting addition available.
-struct SettingsSnapshot: View {
-    let scopes: [ProfileScope]
+/// The panes of the settings window, in the sidebar's order.
+enum SettingsPane: String, CaseIterable, Identifiable {
+    case menuBar, stacks, layouts, scratchpads, general
 
-    var body: some View {
-        SettingsView(scopes: scopes, scriptingAddition: true, scrolls: false, updates: true)
+    var id: String {
+        rawValue
+    }
+
+    var title: String {
+        switch self {
+        case .menuBar: "Menu Bar"
+        case .stacks: "Stacks"
+        case .layouts: "Displays & Spaces"
+        case .scratchpads: "Scratchpads"
+        case .general: "General"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .menuBar: "menubar.rectangle"
+        case .stacks: "square.stack.3d.up"
+        case .layouts: "rectangle.split.3x1"
+        case .scratchpads: "rectangle.on.rectangle"
+        case .general: "gearshape"
+        }
     }
 }
 
+/// The settings as the docs show them (`Shots`): one pane, with the scripting addition available and updates on, as a
+/// release build has them.
+struct SettingsSnapshot: View {
+    let scopes: [ProfileScope]
+    let pane: SettingsPane
+
+    var body: some View {
+        SettingsView(scopes: scopes, scriptingAddition: true, updates: true, picture: true, pane: pane)
+    }
+}
+
+/// A sidebar of panes beside the selected one's form, like System Settings.
 private struct SettingsView: View {
     let scopes: [ProfileScope]
     let scriptingAddition: Bool
-    var scrolls = true
     /// Whether the updater runs: a release build's does; the docs' picture shows one.
     var updates = Updater.shared.isRunning
+    /// Drawn offscreen for the docs (`Shots`): solid colours in place of the sidebar's material, which such a picture
+    /// can't draw, and open at login on as a release build has it, without registering this Mac's.
+    var picture = false
+    @State var pane: SettingsPane = .menuBar
     @AppStorage(Preferences.Key.showLabels) private var showLabels = true
     @AppStorage(Preferences.Key.showAttention) private var showAttention = true
     @AppStorage(Preferences.Key.hideEmptySpaces) private var hideEmptySpaces = false
@@ -63,93 +98,144 @@ private struct SettingsView: View {
     @State private var checkForUpdates = Updater.shared.checksAutomatically
     @State private var installUpdates = Updater.shared.installsAutomatically
 
+    static let size = NSSize(width: 720, height: 540)
+
     private var isTabs: Bool {
         style == IndicatorStyle.tabs.rawValue
     }
 
     var body: some View {
-        Form {
-            Section("Menu Bar") {
-                Toggle("Show space labels", isOn: $showLabels)
-                Toggle("Hide empty spaces", isOn: $hideEmptySpaces)
-                Toggle("One item per display", isOn: $itemPerDisplay)
-            }
-            Section {
-                Toggle("Mark windows that want attention", isOn: $showAttention)
-            } header: {
-                Text("Attention")
-            } footer: {
-                Text(
-                    "A window whose title starts with 🔔 (a terminal's bell, in Ghostty) or a count like (3) gets a red "
-                        + "badge on its indicator, and its space a bar in the menu bar. yabar focus attention goes to the "
-                        + "next one."
-                )
-                .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            Section {
-                Picker("Style", selection: $style) {
-                    Text("Icons").tag(IndicatorStyle.icons.rawValue)
-                    Text("Pills").tag(IndicatorStyle.pills.rawValue)
-                    Text("Tabs (i3)").tag(IndicatorStyle.tabs.rawValue)
-                    Text("Off").tag(IndicatorStyle.off.rawValue)
-                }
-                Picker("Placement", selection: $placement) {
-                    if !isTabs {
-                        Text("Screen edge side").tag(IndicatorPlacement.edges.rawValue)
-                        Text("Left").tag(IndicatorPlacement.left.rawValue)
-                        Text("Right").tag(IndicatorPlacement.right.rawValue)
-                    }
-                    Text("Top").tag(IndicatorPlacement.top.rawValue)
-                    Text("Bottom").tag(IndicatorPlacement.bottom.rawValue)
-                }
-                .disabled(style == IndicatorStyle.off.rawValue)
-            } header: {
-                Text("Stack Indicators")
-            } footer: {
-                Text(roomExplanation).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            ProfilesSection(scopes: scopes)
-            ScratchpadsSection(available: scriptingAddition)
-            Section("Yabar") {
-                Toggle("Open at login", isOn: $launchAtLogin)
-                    .onChange(of: launchAtLogin) { _, on in
-                        LaunchAtLogin.set(on)
-                        launchAtLogin = LaunchAtLogin.isEnabled
-                    }
-                if LaunchAtLogin.needsApproval {
-                    Button("Allow in System Settings…") { SMAppService.openSystemSettingsLoginItems() }
-                }
-                Toggle("Check for updates automatically", isOn: $checkForUpdates)
-                    .onChange(of: checkForUpdates) { _, on in Updater.shared.checksAutomatically = on }
-                    .disabled(!updates)
-                Toggle("Install updates automatically", isOn: $installUpdates)
-                    .onChange(of: installUpdates) { _, on in Updater.shared.installsAutomatically = on }
-                    .disabled(!updates || !checkForUpdates)
-                if !updates {
-                    Text("Updates are off in this build; releases update themselves.")
-                        .font(.caption).foregroundStyle(.secondary)
+        HStack(spacing: 0) {
+            List(SettingsPane.allCases, selection: Binding(
+                get: { pane },
+                set: { if let new = $0 { pane = new } }
+            )) { row in
+                if picture {
+                    // An offscreen window is never key, so its sidebar draws as inactive: give it an active
+                    // one's colours.
+                    Label(row.title, systemImage: row.symbol)
+                        .foregroundStyle(Color.white.opacity(0.88))
+                        .tag(row)
+                        .listRowBackground(RoundedRectangle(cornerRadius: 6)
+                            .fill(Color.white.opacity(row == pane ? 0.11 : 0))
+                            .padding(.horizontal, 10))
+                } else {
+                    Label(row.title, systemImage: row.symbol).tag(row)
                 }
             }
+            .listStyle(.sidebar)
+            .scrollContentBackground(picture ? .hidden : .automatic)
+            .background(picture ? Color(white: 0.19) : .clear)
+            .frame(width: 200)
+            Rectangle().fill(picture ? Color(white: 0.06) : Color(nsColor: .separatorColor)).frame(width: 1)
+            Form { detail }
+                .formStyle(.grouped)
+                .frame(maxWidth: .infinity)
         }
-        .formStyle(.grouped)
-        // Taller than a small screen otherwise; the form scrolls (the docs' picture shows it whole).
-        .scrollIndicators(scrolls ? .automatic : .hidden)
+        .frame(width: Self.size.width, height: Self.size.height)
         // The docs' picture of a release build: updates on, as they come out of the box.
         .onAppear {
             if updates, !Updater.shared.isRunning {
                 checkForUpdates = true
                 installUpdates = true
             }
+            if picture { launchAtLogin = true }
         }
-        .frame(width: 460, height: scrolls ? 700 : 1340)
         .onChange(of: style) { _, new in
             // Tabs only run across the top or bottom.
             if new == IndicatorStyle.tabs.rawValue, placement != IndicatorPlacement.bottom.rawValue {
                 placement = IndicatorPlacement.top.rawValue
             }
         }
+    }
+
+    @ViewBuilder private var detail: some View {
+        switch pane {
+        case .menuBar: menuBar
+        case .stacks: stacks
+        case .layouts: ProfilesSection(scopes: scopes)
+        case .scratchpads: ScratchpadsSection(available: scriptingAddition)
+        case .general: general
+        }
+    }
+
+    @ViewBuilder private var menuBar: some View {
+        Section {
+            Toggle("Show space labels", isOn: $showLabels)
+            Toggle("Hide empty spaces", isOn: $hideEmptySpaces)
+            Toggle("One item per display", isOn: $itemPerDisplay)
+        } header: {
+            Text("Spaces")
+        } footer: {
+            footnote("Labels come from Label Space… in the menu, or yabai. Spaces on screen always show.")
+        }
+    }
+
+    @ViewBuilder private var stacks: some View {
+        Section {
+            Picker("Style", selection: $style) {
+                Text("Icons").tag(IndicatorStyle.icons.rawValue)
+                Text("Pills").tag(IndicatorStyle.pills.rawValue)
+                Text("Tabs (i3)").tag(IndicatorStyle.tabs.rawValue)
+                Text("Off").tag(IndicatorStyle.off.rawValue)
+            }
+            Picker("Placement", selection: $placement) {
+                if !isTabs {
+                    Text("Screen edge side").tag(IndicatorPlacement.edges.rawValue)
+                    Text("Left").tag(IndicatorPlacement.left.rawValue)
+                    Text("Right").tag(IndicatorPlacement.right.rawValue)
+                }
+                Text("Top").tag(IndicatorPlacement.top.rawValue)
+                Text("Bottom").tag(IndicatorPlacement.bottom.rawValue)
+            }
+            .disabled(style == IndicatorStyle.off.rawValue)
+        } header: {
+            Text("Indicators")
+        } footer: {
+            footnote(roomExplanation)
+        }
+        Section {
+            Toggle("Mark windows that want attention", isOn: $showAttention)
+        } header: {
+            Text("Attention")
+        } footer: {
+            footnote(
+                "A window whose title starts with 🔔 (a terminal's bell, in Ghostty) or a count like (3) gets a red "
+                    + "badge on its indicator, and its space a bar in the menu bar. yabar focus attention goes to the "
+                    + "next one."
+            )
+        }
+    }
+
+    @ViewBuilder private var general: some View {
+        Section("Login") {
+            Toggle("Open at login", isOn: $launchAtLogin)
+                .onChange(of: launchAtLogin) { _, on in
+                    guard !picture else { return }
+                    LaunchAtLogin.set(on)
+                    launchAtLogin = LaunchAtLogin.isEnabled
+                }
+            if LaunchAtLogin.needsApproval {
+                Button("Allow in System Settings…") { SMAppService.openSystemSettingsLoginItems() }
+            }
+        }
+        Section {
+            Toggle("Check for updates automatically", isOn: $checkForUpdates)
+                .onChange(of: checkForUpdates) { _, on in Updater.shared.checksAutomatically = on }
+                .disabled(!updates)
+            Toggle("Install updates automatically", isOn: $installUpdates)
+                .onChange(of: installUpdates) { _, on in Updater.shared.installsAutomatically = on }
+                .disabled(!updates || !checkForUpdates)
+        } header: {
+            Text("Updates")
+        } footer: {
+            if !updates { footnote("Updates are off in this build; releases update themselves.") }
+        }
+    }
+
+    private func footnote(_ text: String) -> some View {
+        Text(text).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var roomExplanation: String {

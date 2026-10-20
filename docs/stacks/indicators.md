@@ -19,7 +19,7 @@ while its stack has focus; the others are dimmed, more so when focus is elsewher
 
 ## Placement
 
-Settings → Stack Indicators → **Placement**:
+Settings → Stacks → **Placement**:
 
 - **Screen edge side** (the default): left for a stack in the left half of its display, right otherwise.
 - **Left**, **Right**, **Top** or **Bottom**.
