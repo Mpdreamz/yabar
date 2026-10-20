@@ -4,7 +4,7 @@ import Foundation
 public extension SpacePlan {
     /// The plan as Yabar.app keeps it in its defaults, for the app and for the command line tool alike.
     static func stored(in defaults: UserDefaults?, snapshot: Snapshot) -> SpacePlan {
-        let style = defaults?.string(forKey: "indicatorStyle").flatMap(IndicatorStyle.init(rawValue:)) ?? .icons
+        let style = defaults?.string(forKey: "indicatorStyle").flatMap(IndicatorStyle.init(rawValue:)) ?? .standard
         let placement = defaults?.string(forKey: "indicatorPlacement").flatMap(IndicatorPlacement.init(rawValue:))
             ?? .edges
         return SpacePlan(

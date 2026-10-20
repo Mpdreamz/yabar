@@ -11,7 +11,7 @@ while its stack has focus; the others are dimmed, more so when focus is elsewher
 |---|---|
 | **Icons**: the app's icon on a tile. | ![Icons down the left of a stack of four](../images/shots/indicators/icons.jpg) |
 | **Pills**: a slim pill per window. | ![Pills down the left of a stack](../images/shots/indicators/pills.jpg) |
-| **Tabs (i3)**: a tab per window with its icon and title, across the top or bottom. | ![Tabs across the top of a stack](../images/shots/indicators/tabs.jpg) |
+| **Tabs (i3)**, the default: a tab per window with its icon and title, across the top or bottom. | ![Tabs across the top of a stack](../images/shots/indicators/tabs.jpg) |
 
 - **Click** an indicator to focus its window.
 - **Middle-click** one to close its window.

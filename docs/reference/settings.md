@@ -16,8 +16,8 @@ panes; choices apply as they are made.
 | Menu Bar | Show space labels | on | A label instead of the number. |
 | | Hide empty spaces | off | Spaces on screen always show. |
 | | One item per display | off | An item per display instead of one. |
-| Stacks | Style | Icons | Icons, Pills, Tabs (i3), Off. |
-| | Placement | Screen edge side | Or Left, Right, Top, Bottom. |
+| Stacks | Style | Tabs (i3) | Tabs (i3), Icons, Pills, Off. |
+| | Placement | Screen edge side | Or Left, Right, Top, Bottom. Tabs take the top unless Bottom is chosen. |
 | | Mark windows that want attention | on | [Attention](../stacks/attention.md). |
 | Displays & Spaces | … | inherit | [Profiles](../layouts/profiles.md). |
 | Scratchpads | … | none | [Scratchpads](../moving-around/scratchpads.md); needs the scripting addition. |

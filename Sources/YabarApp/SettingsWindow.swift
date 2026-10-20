@@ -92,7 +92,7 @@ private struct SettingsView: View {
     @AppStorage(Preferences.Key.showAttention) private var showAttention = true
     @AppStorage(Preferences.Key.hideEmptySpaces) private var hideEmptySpaces = false
     @AppStorage(Preferences.Key.itemPerDisplay) private var itemPerDisplay = false
-    @AppStorage(Preferences.Key.indicatorStyle) private var style = IndicatorStyle.icons.rawValue
+    @AppStorage(Preferences.Key.indicatorStyle) private var style = IndicatorStyle.standard.rawValue
     @AppStorage(Preferences.Key.indicatorPlacement) private var placement = IndicatorPlacement.edges.rawValue
     @State private var launchAtLogin = LaunchAtLogin.isEnabled
     @State private var checkForUpdates = Updater.shared.checksAutomatically
