@@ -10,6 +10,7 @@ usage: yabar focus <west|east|north|south>  [--axis horizontal|vertical]
        yabar focus <next|prev>
        yabar focus attention
        yabar scratchpad <name>
+       yabar launcher
        yabar --version
 
   focus west|east|north|south
@@ -27,6 +28,11 @@ usage: yabar focus <west|east|north|south>  [--axis horizontal|vertical]
   scratchpad <name>
       Show or hide a scratchpad set up in Yabar's settings (yabai's own scratchpads: they need its scripting
       addition). When its app is not running yet, launch it; its first window becomes the scratchpad.
+
+  launcher
+      Open Yabar's launcher: windows on every space, stacks, scratchpads, apps, and Yabar's and yabai's commands
+      (> runs a raw yabai command). Enter goes there or launches; Cmd+Enter opens a new copy of the app. Starts
+      Yabar.app first when it is not running.
 
   skhd, for example:
       lcmd - h : yabar focus west
@@ -124,6 +130,30 @@ if let flag = args.firstIndex(of: "--axis") {
     }
     axis = value
     args.removeSubrange(flag ... flag + 1)
+}
+
+if args == ["launcher"] {
+    // Ask the running app over its socket, then have Launch Services bring it forward: an app may not take focus on
+    // its own (a request over a socket is not the user's), and a launcher has to have the keyboard. When nothing
+    // answers, start Yabar first and wait for its socket.
+    func bringForward() {
+        let open = Process()
+        open.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        open.arguments = ["-b", "io.github.mpdreamz.yabar"]
+        do { try open.run() } catch { fail("could not start Yabar.app: \(error)") }
+        open.waitUntilExit()
+    }
+    if !Listener.send("launcher", to: Signals.listenerPath) {
+        bringForward()
+        var sent = false
+        for _ in 0 ..< 50 where !sent {
+            try? await Task.sleep(for: .milliseconds(100))
+            sent = Listener.send("launcher", to: Signals.listenerPath)
+        }
+        guard sent else { fail("Yabar.app did not start listening") }
+    }
+    bringForward()
+    exit(0)
 }
 
 if args.count == 2, args[0] == "scratchpad" {

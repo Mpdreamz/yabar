@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Quitting: nothing is redrawn or made room for any more.
     private var terminating = false
     private let settings = SettingsWindow()
+    private let launcher = LauncherController()
     private var labels = Preferences.spaceLabels
     /// yabai's scripting addition was loaded at the last look; scratchpads need it.
     private var scriptingAddition = ScriptingAddition.isLoaded()
@@ -56,8 +57,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             MainActor.assumeIsolated { self?.settingsChanged() }
         }
         quitOnSignals()
+        session.onLauncher = { [weak self] in self?.showLauncher() }
+        launcher.perform = { [weak self] action, newCopy in self?.perform(action, newCopy: newCopy) }
         session.start()
         drawSpaces()
+
         syncScratchpads()
     }
 
@@ -141,6 +145,66 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         overlays?.redraw(session.snapshot)
         makeRoom()
         syncScratchpads()
+    }
+
+    // MARK: Launcher
+
+    private func showLauncher() {
+        guard !terminating else { return }
+        scriptingAddition = ScriptingAddition.isLoaded()
+        launcher.show(
+            snapshot: session.snapshot, scratchpads: Preferences.scratchpads, scriptingAddition: scriptingAddition
+        )
+    }
+
+    /// Runs a launcher pick. With Cmd (a new copy), whatever the row, its app is opened again (`open -n`).
+    private func perform(_ action: LauncherItem.Action, newCopy: Bool) {
+        if newCopy {
+            switch action {
+            case let .open(app): Self.open(app, newCopy: true)
+            case let .focus(window):
+                if let app = session.snapshot?.windows.first(where: { $0.id == window })?.app {
+                    Self.open(app, newCopy: true)
+                }
+            case .yabai, .yabar: break
+            }
+            return
+        }
+        switch action {
+        case let .focus(window): session.focus(window: window)
+        case let .open(app): Self.open(app, newCopy: false)
+        case let .yabai(commands):
+            // After the launcher has handed focus back, so yabai acts on your window, not on it.
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(150))
+                self?.run(commands)
+            }
+        case let .yabar(command): perform(command)
+        }
+    }
+
+    private func perform(_ command: YabarCommand) {
+        switch command {
+        case .focusAttention:
+            guard let snapshot = session.snapshot else { return }
+            let focused = snapshot.windows.first(where: \.hasFocus)?.id
+            if let next = snapshot.windowsNeedingAttention(after: focused).first { session.focus(window: next) }
+        case .labelSpace: labelFocusedSpace()
+        case .settings: showSettings()
+        case .indicatorsIcons: Preferences.indicatorStyle = .icons
+        case .indicatorsPills: Preferences.indicatorStyle = .pills
+        case .indicatorsTabs: Preferences.indicatorStyle = .tabs
+        case .indicatorsOff: Preferences.indicatorStyle = .off
+        case .recoverScratchpads: recoverScratchpads()
+        }
+    }
+
+    /// `open -a`, or `open -n -a` for a new copy, with an app's name or its bundle's path.
+    private static func open(_ app: String, newCopy: Bool) {
+        let open = Process()
+        open.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        open.arguments = (newCopy ? ["-n"] : []) + ["-a", app]
+        try? open.run()
     }
 
     // MARK: Scratchpads

@@ -259,3 +259,17 @@ struct RefresherTests {
         #expect(throws: YabaiError.notRunning("x")) { try result?.get() }
     }
 }
+
+@Suite(.timeLimit(.minutes(1)))
+struct ListenerSendTests {
+    /// `yabar launcher` reaches the running app as a line on its socket; with nothing listening, it says so.
+    @Test func aLineReachesTheListener() async throws {
+        let listener = Listener(path: "/tmp/yabar-test-\(UUID().uuidString.prefix(8)).socket")
+        try listener.start()
+        defer { listener.stop() }
+        #expect(Listener.send("launcher", to: listener.path))
+        var iterator = listener.pokes.makeAsyncIterator()
+        #expect(await iterator.next() == Poke(event: "launcher"))
+        #expect(!Listener.send("launcher", to: "/tmp/yabar-test-nobody.socket"))
+    }
+}

@@ -17,6 +17,7 @@ enum Preferences {
         static let spaceLabels = "spaceLabels"
         static let profiles = "profiles"
         static let scratchpads = "scratchpads"
+        static let launcherUsage = "launcherUsage"
         /// Spaces whose padding or gap Yabar changed and has not put back yet (space ids).
         static let roomSpaces = "roomSpaces"
     }
@@ -64,6 +65,15 @@ enum Preferences {
     static var scratchpads: [Scratchpad] {
         get { Scratchpads.stored(in: defaults) }
         set { defaults.set(try? JSONEncoder().encode(newValue), forKey: Key.scratchpads) }
+    }
+
+    /// How often each launcher row was picked (`LauncherUsage`).
+    static var launcherUsage: LauncherUsage {
+        get {
+            defaults.data(forKey: Key.launcherUsage).flatMap { try? JSONDecoder().decode(LauncherUsage.self, from: $0) }
+                ?? LauncherUsage()
+        }
+        set { defaults.set(try? JSONEncoder().encode(newValue), forKey: Key.launcherUsage) }
     }
 
     /// Everything that decides what Yabar keeps each space at, for this snapshot's displays.
