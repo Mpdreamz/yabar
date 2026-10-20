@@ -306,8 +306,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 let name = window.title.isEmpty || window.title == window.app
                     ? window.app : "\(window.app) — \(window.title)"
                 let entry = NSMenuItem(
-                    title: String(name.prefix(70)), action: #selector(focusWindow(_:)), keyEquivalent: ""
+                    title: Self.fitted(name, width: Self.titleWidth), action: #selector(focusWindow(_:)),
+                    keyEquivalent: ""
                 )
+                entry.toolTip = name
                 entry.target = self
                 entry.tag = window.id
                 entry.indentationLevel = 1
@@ -362,6 +364,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let raw = item.representedObject as? String,
               let placement = IndicatorPlacement(rawValue: raw) else { return }
         Preferences.indicatorPlacement = placement
+    }
+
+    /// How wide a window's name may be in the menu, so a long title doesn't stretch it across the screen.
+    private static let titleWidth: CGFloat = 320
+
+    /// `text` as it fits in `width` points of the menu's font, cut with "…" at the end when it doesn't.
+    private static func fitted(_ text: String, width: CGFloat) -> String {
+        let font = NSFont.menuFont(ofSize: 0)
+        func measure(_ string: String) -> CGFloat {
+            (string as NSString).size(withAttributes: [.font: font]).width
+        }
+        guard measure(text) > width else { return text }
+        let characters = Array(text)
+        var low = 0
+        var high = characters.count
+        while low < high {
+            let middle = (low + high + 1) / 2
+            if measure(String(characters[..<middle]) + "…") <= width { low = middle } else { high = middle - 1 }
+        }
+        return String(characters[..<low]).trimmingCharacters(in: .whitespaces) + "…"
     }
 
     private func icon(for pid: Int32) -> NSImage? {
