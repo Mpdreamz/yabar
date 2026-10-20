@@ -45,18 +45,31 @@ public struct Snapshot: Equatable, Sendable {
 
     /// The stacks on every space, in space order, then left to right, top to bottom.
     ///
-    /// yabai does not name a window's stack, only its place in it (`stack-index`); the windows of one stack share
-    /// their node's frame. So a stack is the windows with a `stack-index` on one space with one frame, the approach
-    /// stackline and yabai-dockstack take as well. Minimized and hidden windows are not on screen and are left out.
+    /// yabai does not name a window's stack, only its place in it (`stack-index`); the windows of one stack are given
+    /// their node's frame. Not all of them take it exactly: an app with a minimum size, or a terminal sizing itself to
+    /// whole cells, keeps a frame a little off, and while yabai moves a stack its windows arrive one by one. So a stack
+    /// is the windows with a `stack-index` on one space that overlap, since tiles never do; matching frames exactly
+    /// had such a stack come and go as the room made for its indicators resized it. Minimized and hidden windows are
+    /// not on screen and are left out.
     public var stacks: [Stack] {
-        var groups: [Stack.ID: [Window]] = [:]
+        var groups: [[Window]] = []
         for window in windows where window.stackIndex > 0 && !window.isMinimized && !window.isHidden {
-            guard let space = space(index: window.space) else { continue }
-            groups[Stack.ID(space: space.id, frame: window.frame), default: []].append(window)
+            guard space(index: window.space) != nil else { continue }
+            let joins = groups.indices.filter { index in
+                groups[index].contains { $0.space == window.space && $0.frame.overlapsMostly(window.frame) }
+            }
+            var group = [window]
+            for index in joins.reversed() {
+                group += groups.remove(at: index)
+            }
+            groups.append(group)
         }
         return groups
-            .filter { $0.value.count > 1 }
-            .map { Stack(id: $0.key, spaceIndex: $0.value[0].space, windows: $0.value) }
+            .filter { $0.count > 1 }
+            .compactMap { group in
+                guard let space = space(index: group[0].space) else { return nil }
+                return Stack(space: space.id, spaceIndex: space.index, windows: group)
+            }
             .sorted { ($0.spaceIndex, $0.frame.y, $0.frame.x) < ($1.spaceIndex, $1.frame.y, $1.frame.x) }
     }
 }
@@ -85,14 +98,23 @@ public struct Stack: Equatable, Sendable, Identifiable {
     /// In stack order (`stack-index` 1 first).
     public var windows: [Window]
 
+    /// The stack's node: the frame most of its windows have, the first in stack order's when none is shared.
+    public var frame: Frame
+
     public init(id: ID, spaceIndex: Int, windows: [Window]) {
         self.id = id
         self.spaceIndex = spaceIndex
         self.windows = windows.sorted { $0.stackIndex < $1.stackIndex }
+        let frames = self.windows.map(\.frame)
+        frame = frames.max { a, b in
+            frames.count(where: { $0 == a }) < frames.count(where: { $0 == b })
+        } ?? Frame(x: 0, y: 0, w: 0, h: 0)
     }
 
-    public var frame: Frame {
-        windows[0].frame
+    /// Known by its node's frame on `space`.
+    public init(space: UInt64, spaceIndex: Int, windows: [Window]) {
+        self.init(id: ID(space: space, frame: Frame(x: 0, y: 0, w: 0, h: 0)), spaceIndex: spaceIndex, windows: windows)
+        id = ID(space: space, frame: frame)
     }
 
     /// The window on top, as far as the snapshot alone can tell: the focused one. yabai reports every window of a

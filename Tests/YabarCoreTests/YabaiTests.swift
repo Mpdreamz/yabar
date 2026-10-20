@@ -67,6 +67,36 @@ struct StackTests {
         #expect(after.stacks[0].id == before.stacks[0].id)
         #expect(after.stacks[0].windows.map(\.id) == [101, 102, 103, 104])
     }
+
+    /// A window that keeps a frame a little off its node's (a minimum size, a terminal sizing to whole cells, a move
+    /// half done) stays in its stack, and the stack keeps its node's frame and its id.
+    @Test func aWindowOffItsNodeStaysInTheStack() throws {
+        let before = try Fixtures.snapshot()
+        var after = before
+        let index = after.windows.firstIndex { $0.id == 103 }!
+        after.windows[index].frame.w -= 5
+        after.windows[index].frame.h -= 11
+        #expect(after.stacks.map { $0.windows.map(\.id) } == [[101, 102, 103], [201, 202], [501, 502]])
+        #expect(after.stacks[0].id == before.stacks[0].id)
+        #expect(after.stacks[0].frame == before.stacks[0].frame)
+    }
+
+    @Test func stacksOnOtherSpacesStayApart() throws {
+        var snapshot = try Fixtures.snapshot()
+        let frame = snapshot.stacks[0].frame
+        for index in snapshot.windows.indices where snapshot.windows[index].space == 2 {
+            snapshot.windows[index].frame = frame
+        }
+        #expect(snapshot.stacks.map { $0.windows.map(\.id) } == [[101, 102, 103], [201, 202], [501, 502]])
+    }
+
+    @Test func neighbouringTilesDoNotOverlap() {
+        let left = Frame(x: 0, y: 0, w: 100, h: 100)
+        #expect(!left.overlapsMostly(Frame(x: 100, y: 0, w: 100, h: 100)))
+        // A tile a point over its neighbour, as yabai's rounding leaves them.
+        #expect(!left.overlapsMostly(Frame(x: 99, y: 0, w: 100, h: 100)))
+        #expect(left.overlapsMostly(Frame(x: 0, y: 0, w: 95, h: 89)))
+    }
 }
 
 @Suite(.timeLimit(.minutes(1)))

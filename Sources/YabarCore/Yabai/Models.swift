@@ -16,6 +16,16 @@ public struct Frame: Codable, Hashable, Sendable {
     }
 }
 
+extension Frame {
+    /// The two cover each other for the most part: more than half of the smaller one is inside the other.
+    func overlapsMostly(_ other: Frame) -> Bool {
+        let w = min(x + w, other.x + other.w) - max(x, other.x)
+        let h = min(y + h, other.y + other.h) - max(y, other.y)
+        guard w > 0, h > 0 else { return false }
+        return w * h > min(self.w * self.h, other.w * other.h) / 2
+    }
+}
+
 public struct Display: Codable, Hashable, Sendable, Identifiable {
     public var id: Int
     public var uuid: String
