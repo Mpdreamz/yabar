@@ -131,6 +131,9 @@ final class IndicatorView: NSView {
     }
 
     private var entries: [Entry] = []
+    /// A window's app icon: its running app's. The docs' pictures swap in icons from app bundles (`Shots`).
+    nonisolated(unsafe) static var icon: (Window)
+        -> NSImage? = { NSRunningApplication(processIdentifier: $0.pid)?.icon }
     private var style = IndicatorStyle.icons
     private var stackHasFocus = false
     private let focus: (Int) -> Void
@@ -165,7 +168,7 @@ final class IndicatorView: NSView {
                 windowID: item.windowID,
                 rect: NSRect(x: item.frame.x, y: item.frame.y, width: item.frame.w, height: item.frame.h),
                 isTop: item.isTop,
-                icon: window.flatMap { NSRunningApplication(processIdentifier: $0.pid)?.icon },
+                icon: window.flatMap(Self.icon),
                 title: window.map { $0.title.isEmpty ? $0.app : "\($0.app) — \($0.title)" } ?? "",
                 label: window.map { $0.title.isEmpty ? $0.app : $0.title } ?? "",
                 attention: Preferences.showAttention ? window?.attention : nil

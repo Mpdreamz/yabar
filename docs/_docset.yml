@@ -1,0 +1,48 @@
+project: 'Yabar'
+max_toc_depth: 2
+dev_docs: true
+
+branding:
+  icon: images/png/yabar-64.png
+  favicon: images/png/yabar-32.png
+  og-image: images/social.jpg
+  apple-touch-icon: images/png/yabar-180.png
+
+# Every image under images is drawn by Yabar from fixed fixtures: `mise run shots` (scripts/shots.sh).
+toc:
+  - file: index.md
+  - folder: getting-started
+    children:
+      - file: index.md
+      - file: installation.md
+      - file: the-menu-bar.md
+      - file: keys.md
+  - folder: stacks
+    children:
+      - file: index.md
+      - file: indicators.md
+      - file: room.md
+      - file: attention.md
+  - folder: moving-around
+    children:
+      - file: index.md
+      - file: focus.md
+      - file: launcher.md
+      - file: scratchpads.md
+  - folder: layouts
+    children:
+      - file: index.md
+      - file: profiles.md
+      - file: labels.md
+      - file: auto-stack.md
+      - file: columns.md
+      - file: focus-sizing.md
+  - folder: reference
+    children:
+      - file: index.md
+      - file: settings.md
+      - file: cli.md
+      - file: yabai.md
+      - file: files.md
+      - file: updates.md
+  - file: troubleshooting.md

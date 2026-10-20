@@ -4,6 +4,7 @@
 <dict>
   <key>CFBundleName</key><string>Yabar</string>
   <key>CFBundleDisplayName</key><string>Yabar</string>
+  <key>CFBundleIconFile</key><string>Yabar</string>
   <key>CFBundleIdentifier</key><string>io.github.mpdreamz.yabar</string>
   <key>CFBundleExecutable</key><string>Yabar</string>
   <key>CFBundlePackageType</key><string>APPL</string>

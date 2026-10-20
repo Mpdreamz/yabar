@@ -160,7 +160,7 @@ struct LauncherView: View {
     let usage: LauncherUsage
     let run: (LauncherItem, Bool) -> Void
     let dismiss: () -> Void
-    @State private var query = ""
+    @State var query = ""
     @State private var selection = 0
     @FocusState private var focused: Bool
 

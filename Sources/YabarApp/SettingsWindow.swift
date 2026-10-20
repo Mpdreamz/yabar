@@ -38,9 +38,21 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     }
 }
 
+/// The settings as the docs show them (`Shots`): the window's form, with the scripting addition available.
+struct SettingsSnapshot: View {
+    let scopes: [ProfileScope]
+
+    var body: some View {
+        SettingsView(scopes: scopes, scriptingAddition: true, scrolls: false, updates: true)
+    }
+}
+
 private struct SettingsView: View {
     let scopes: [ProfileScope]
     let scriptingAddition: Bool
+    var scrolls = true
+    /// Whether the updater runs: a release build's does; the docs' picture shows one.
+    var updates = Updater.shared.isRunning
     @AppStorage(Preferences.Key.showLabels) private var showLabels = true
     @AppStorage(Preferences.Key.showAttention) private var showAttention = true
     @AppStorage(Preferences.Key.hideEmptySpaces) private var hideEmptySpaces = false
@@ -69,10 +81,11 @@ private struct SettingsView: View {
             } footer: {
                 Text(
                     "A window whose title starts with 🔔 (a terminal's bell, in Ghostty) or a count like (3) gets a red "
-                        + "badge on its indicator, and its space a bar in the menu bar. `yabar focus attention` goes to the "
+                        + "badge on its indicator, and its space a bar in the menu bar. yabar focus attention goes to the "
                         + "next one."
                 )
-                .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+                .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             Section {
                 Picker("Style", selection: $style) {
@@ -110,19 +123,27 @@ private struct SettingsView: View {
                 }
                 Toggle("Check for updates automatically", isOn: $checkForUpdates)
                     .onChange(of: checkForUpdates) { _, on in Updater.shared.checksAutomatically = on }
-                    .disabled(!Updater.shared.isRunning)
+                    .disabled(!updates)
                 Toggle("Install updates automatically", isOn: $installUpdates)
                     .onChange(of: installUpdates) { _, on in Updater.shared.installsAutomatically = on }
-                    .disabled(!Updater.shared.isRunning || !checkForUpdates)
-                if !Updater.shared.isRunning {
+                    .disabled(!updates || !checkForUpdates)
+                if !updates {
                     Text("Updates are off in this build; releases update themselves.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
         }
         .formStyle(.grouped)
-        // Taller than a small screen otherwise; the form scrolls.
-        .frame(width: 460, height: 700)
+        // Taller than a small screen otherwise; the form scrolls (the docs' picture shows it whole).
+        .scrollIndicators(scrolls ? .automatic : .hidden)
+        // The docs' picture of a release build: updates on, as they come out of the box.
+        .onAppear {
+            if updates, !Updater.shared.isRunning {
+                checkForUpdates = true
+                installUpdates = true
+            }
+        }
+        .frame(width: 460, height: scrolls ? 700 : 1340)
         .onChange(of: style) { _, new in
             // Tabs only run across the top or bottom.
             if new == IndicatorStyle.tabs.rawValue, placement != IndicatorPlacement.bottom.rawValue {

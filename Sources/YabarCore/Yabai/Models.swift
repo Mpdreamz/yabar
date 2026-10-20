@@ -123,6 +123,28 @@ public struct Window: Codable, Hashable, Sendable, Identifiable {
     public var isFloating: Bool
     public var isNativeFullscreen: Bool
 
+    public init(
+        id: Int, pid: Int32, app: String, title: String, scratchpad: String = "", frame: Frame, display: Int = 1,
+        space: Int, stackIndex: Int = 0, hasFocus: Bool = false, isVisible: Bool = true, isMinimized: Bool = false,
+        isHidden: Bool = false, isFloating: Bool = false, isNativeFullscreen: Bool = false
+    ) {
+        self.id = id
+        self.pid = pid
+        self.app = app
+        self.title = title
+        self.scratchpad = scratchpad
+        self.frame = frame
+        self.display = display
+        self.space = space
+        self.stackIndex = stackIndex
+        self.hasFocus = hasFocus
+        self.isVisible = isVisible
+        self.isMinimized = isMinimized
+        self.isHidden = isHidden
+        self.isFloating = isFloating
+        self.isNativeFullscreen = isNativeFullscreen
+    }
+
     public static let queryProperties = "id,pid,app,title,scratchpad,frame,display,space,stack-index,has-focus,"
         + "is-visible,is-minimized,is-hidden,is-floating,is-native-fullscreen"
 

@@ -29,6 +29,8 @@ if ! otool -l "$app/Contents/MacOS/Yabar" | grep -q "@executable_path/../Framewo
 fi
 sed -e "s/__VERSION__/$version/g" -e "s/__BUILD__/$build/g" -e "s/__COMMIT__/$commit/g" \
   "$root/Resources/Info.plist" >"$app/Contents/Info.plist"
+# The app icon: the mark, drawn by `mise run shots` (scripts/shots.sh) into Resources/Yabar.icns.
+cp "$root/Resources/Yabar.icns" "$app/Contents/Resources/"
 codesign --force --sign - "$app/Contents/Helpers/yabar"
 codesign --force --deep --sign - "$app/Contents/Frameworks/Sparkle.framework"
 codesign --force --sign - "$app"
