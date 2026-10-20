@@ -258,14 +258,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: The menu
 
+    /// Actions first, then Yabar itself, then the overview of every space and its windows, last.
     private func makeMenu() -> NSMenu {
         let menu = NSMenu()
-        if let snapshot = session.snapshot {
-            addSpaces(of: snapshot, to: menu)
-        } else {
-            menu.addItem(disabled(yabaiStatus))
-        }
-        menu.addItem(.separator())
         if let space = session.snapshot?.focusedSpace {
             let label = NSMenuItem(
                 title: "Label Space \(space.index)…", action: #selector(labelFocusedSpace), keyEquivalent: ""
@@ -288,6 +283,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
         ))
+        menu.addItem(.separator())
+        if let snapshot = session.snapshot {
+            addSpaces(of: snapshot, to: menu)
+        } else {
+            menu.addItem(disabled(yabaiStatus))
+        }
         return menu
     }
 
