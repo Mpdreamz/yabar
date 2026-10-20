@@ -74,7 +74,7 @@ struct SettingsSnapshot: View {
     let pane: SettingsPane
 
     var body: some View {
-        SettingsView(scopes: scopes, scriptingAddition: true, updates: true, pane: pane)
+        SettingsView(scopes: scopes, scriptingAddition: true, updates: true, picture: true, pane: pane)
     }
 }
 
@@ -84,6 +84,9 @@ private struct SettingsView: View {
     let scriptingAddition: Bool
     /// Whether the updater runs: a release build's does; the docs' picture shows one.
     var updates = Updater.shared.isRunning
+    /// Drawn offscreen for the docs (`Shots`): solid colours in place of the sidebar's material, which such a picture can't
+    /// draw, and open at login on as a release build has it, without registering this Mac's.
+    var picture = false
     @State var pane: SettingsPane = .menuBar
     @AppStorage(Preferences.Key.showLabels) private var showLabels = true
     @AppStorage(Preferences.Key.showAttention) private var showAttention = true
@@ -106,12 +109,24 @@ private struct SettingsView: View {
             List(SettingsPane.allCases, selection: Binding(
                 get: { pane },
                 set: { if let new = $0 { pane = new } }
-            )) { pane in
-                Label(pane.title, systemImage: pane.symbol).tag(pane)
+            )) { row in
+                if picture {
+                    // An offscreen window is never key, so its sidebar draws as inactive: give it an active one's colours.
+                    Label(row.title, systemImage: row.symbol)
+                        .foregroundStyle(Color.white.opacity(0.88))
+                        .tag(row)
+                        .listRowBackground(RoundedRectangle(cornerRadius: 6)
+                            .fill(Color.white.opacity(row == pane ? 0.11 : 0))
+                            .padding(.horizontal, 10))
+                } else {
+                    Label(row.title, systemImage: row.symbol).tag(row)
+                }
             }
             .listStyle(.sidebar)
+            .scrollContentBackground(picture ? .hidden : .automatic)
+            .background(picture ? Color(white: 0.19) : .clear)
             .frame(width: 200)
-            Rectangle().fill(Color(nsColor: .separatorColor)).frame(width: 1)
+            Rectangle().fill(picture ? Color(white: 0.06) : Color(nsColor: .separatorColor)).frame(width: 1)
             Form { detail }
                 .formStyle(.grouped)
                 .frame(maxWidth: .infinity)
@@ -123,6 +138,7 @@ private struct SettingsView: View {
                 checkForUpdates = true
                 installUpdates = true
             }
+            if picture { launchAtLogin = true }
         }
         .onChange(of: style) { _, new in
             // Tabs only run across the top or bottom.
@@ -194,6 +210,7 @@ private struct SettingsView: View {
         Section("Login") {
             Toggle("Open at login", isOn: $launchAtLogin)
                 .onChange(of: launchAtLogin) { _, on in
+                    guard !picture else { return }
                     LaunchAtLogin.set(on)
                     launchAtLogin = LaunchAtLogin.isEnabled
                 }
