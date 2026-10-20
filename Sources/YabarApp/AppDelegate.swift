@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var terminating = false
     private let settings = SettingsWindow()
     private let launcher = LauncherController()
+    private lazy var focusSizer = FocusSizer(yabai: session.yabai)
     private var labels = Preferences.spaceLabels
     /// yabai's scripting addition was loaded at the last look; scratchpads need it.
     private var scriptingAddition = ScriptingAddition.isLoaded()
@@ -37,7 +38,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             overlays?.apply(changes, in: session.snapshot)
             if !changes.added.isEmpty || !changes.removed.isEmpty || changes.spaces { makeRoom() }
         }
-        session.onSnapshot = { [weak self] old, new in self?.autoStack(from: old, to: new) }
+        session.onSnapshot = { [weak self] old, new in
+            self?.autoStack(from: old, to: new)
+            if self?.terminating == false { self?.focusSizer.consider(new) }
+        }
         session.onHeartbeat = { [weak self] in self?.checkScriptingAddition() }
         session.onRestart = { [weak self] in
             guard let self else { return }
@@ -147,6 +151,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         overlays?.redraw(session.snapshot)
         makeRoom()
         syncScratchpads()
+        focusSizer.reset()
+        if let snapshot = session.snapshot { focusSizer.consider(snapshot) }
     }
 
     // MARK: Launcher
