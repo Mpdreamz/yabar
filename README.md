@@ -34,7 +34,8 @@ It talks to yabai's socket directly: no Yabar.app needed, no permissions, a few 
 
 ## Displays, spaces and auto-stack
 
-Settings → Displays & Spaces sets a layout, padding, gap, stack indicator style and a maximum number of tiles for
+Settings → Displays & Spaces sets a layout, padding, gap, stack indicator style, a maximum number of tiles, a number of
+columns and focus sizing for
 built-in displays, external displays, one display, or one labelled space (Label This Space… in the menu). With a
 maximum, a new window that would make one tile too many goes into a stack on the tile that had focus. Yabar keeps all
 of this as per-space settings in yabai and puts .yabairc's values back when it quits.
@@ -65,3 +66,11 @@ Each row has its app's icon and badges for its space, its place in a stack, a sc
 - Picks you make often rank higher. Esc closes it and gives focus back.
 
 `yabar launcher` starts Yabar.app first when it is not running.
+
+### Columns and focus sizing
+
+**Columns** lay new windows out side by side instead of yabai's spiral; beyond them a new window becomes a row under the
+focused tile (or joins its stack). **Re-arrange this space as columns** in the launcher lays out the windows already
+there. **Focus sizing** gives the focused tile's column a share of the width (golden ratio, 0.62, by default) and the
+tile that share of its column's height, the rest shared equally; it follows focus from tile to tile. Apps with a
+minimum size bigger than their share keep it, and focus sizing then leaves that space as it is.

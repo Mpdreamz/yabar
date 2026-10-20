@@ -76,11 +76,23 @@ public enum Navigator {
 public enum TileOrder {
     /// Indexes into `frames`, in yabai's order.
     public static func order(_ frames: [Frame]) -> [Int] {
-        split(Array(frames.indices), frames)
+        tree(frames)?.leaves ?? []
     }
 
-    private static func split(_ tiles: [Int], _ frames: [Frame]) -> [Int] {
-        guard tiles.count > 1 else { return tiles }
+    /// The splits that make up a tiling, as far as frames can tell (an even grid could have been cut either way first;
+    /// the longer side is assumed, as yabai's automatic split does).
+    public static func tree(_ frames: [Frame]) -> TileTree? {
+        frames.isEmpty ? nil : split(Array(frames.indices), frames, strict: false)
+    }
+
+    /// The tree only when the frames really tile the space: no window wider or taller than its split allows (an app
+    /// with a minimum size overlaps its neighbour, and then frames no longer say where yabai's lines are).
+    public static func strictTree(_ frames: [Frame]) -> TileTree? {
+        frames.isEmpty ? nil : split(Array(frames.indices), frames, strict: true)
+    }
+
+    private static func split(_ tiles: [Int], _ frames: [Frame], strict: Bool) -> TileTree? {
+        guard tiles.count > 1 else { return .leaf(tiles[0]) }
         let slack = 1.0
         // Where both lines exist (an even grid) the tree cannot say which came first; yabai's automatic split cuts the
         // longer side, so that line is tried first. Each is tried nearest the start.
@@ -93,11 +105,33 @@ public enum TileOrder {
                     .filter { (vertical ? frames[$0].x + frames[$0].w : frames[$0].y + frames[$0].h) <= cut + slack }
                 let second = tiles.filter { (vertical ? frames[$0].x : frames[$0].y) >= cut - slack }
                 if !first.isEmpty, !second.isEmpty, first.count + second.count == tiles.count {
-                    return split(first, frames) + split(second, frames)
+                    guard let a = split(first, frames, strict: strict), let b = split(second, frames, strict: strict)
+                    else { return nil }
+                    return .split(vertical: vertical, first: a, second: b)
                 }
             }
         }
-        // Not a tiling (floating leftovers, overlaps): reading order.
-        return tiles.sorted { (frames[$0].y, frames[$0].x) < (frames[$1].y, frames[$1].x) }
+        // Not a tiling (floating leftovers, overlaps): reading order, as a chain, unless only a real tiling will do.
+        if strict { return nil }
+        let sorted = tiles.sorted { (frames[$0].y, frames[$0].x) < (frames[$1].y, frames[$1].x) }
+        return sorted.dropFirst().reduce(TileTree.leaf(sorted[0])) { .split(
+            vertical: false,
+            first: $0,
+            second: .leaf($1)
+        ) }
+    }
+}
+
+/// A tiling as splits: a tile, or a line (vertical: left | right; else top / bottom) with what is on either side.
+public indirect enum TileTree: Equatable, Sendable {
+    case leaf(Int)
+    case split(vertical: Bool, first: TileTree, second: TileTree)
+
+    /// The tiles, first side first.
+    public var leaves: [Int] {
+        switch self {
+        case let .leaf(tile): [tile]
+        case let .split(_, first, second): first.leaves + second.leaves
+        }
     }
 }
