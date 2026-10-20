@@ -21,6 +21,8 @@ final class Session {
     var onChange: ((Changes) -> Void)?
     /// yabai restarted (or came back): whatever Yabar set in it is gone.
     var onRestart: (() -> Void)?
+    /// Every heartbeat (a few seconds), for checks nothing announces: the scripting addition being loaded, say.
+    var onHeartbeat: (() -> Void)?
     /// Every new snapshot with the one before it, to act on what appeared in between (`AutoStack`).
     var onSnapshot: ((_ old: Snapshot, _ new: Snapshot) -> Void)?
 
@@ -68,6 +70,7 @@ final class Session {
     /// seconds, ask whether Yabar's signals are still there, and look again. Gone means yabai restarted (add them
     /// again); no answer means it stopped.
     private func check() {
+        onHeartbeat?()
         guard error == nil else { return }
         Task { [yabai, refresher, weak self] in
             if let present = try? await yabai.hasSignals(), !present {

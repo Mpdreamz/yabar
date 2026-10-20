@@ -85,6 +85,16 @@ public struct Yabai: Sendable {
         return Signals.events.allSatisfy { labels.contains(Signals.labelPrefix + $0) }
     }
 
+    /// The labels of every rule yabai has (unlabelled ones are empty).
+    public func ruleLabels() async throws(YabaiError) -> [String] {
+        struct Entry: Decodable { let label: String }
+        let data = try await socket.send(["rule", "--list"])
+        guard let entries = try? JSONDecoder().decode([Entry].self, from: data) else {
+            throw .io("rule --list: unexpected reply")
+        }
+        return entries.map(\.label)
+    }
+
     /// Best effort: a signal yabai no longer has is not an error worth stopping for.
     public func removeSignals() async {
         _ = try? await run(Signals.removeRule)

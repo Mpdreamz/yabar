@@ -107,6 +107,8 @@ public struct Window: Codable, Hashable, Sendable, Identifiable {
     public var pid: Int32
     public var app: String
     public var title: String
+    /// The yabai scratchpad this window is (its label), or empty.
+    public var scratchpad: String
     public var frame: Frame
     /// The display's arrangement index.
     public var display: Int
@@ -121,11 +123,11 @@ public struct Window: Codable, Hashable, Sendable, Identifiable {
     public var isFloating: Bool
     public var isNativeFullscreen: Bool
 
-    public static let queryProperties = "id,pid,app,title,frame,display,space,stack-index,has-focus,is-visible,"
-        + "is-minimized,is-hidden,is-floating,is-native-fullscreen"
+    public static let queryProperties = "id,pid,app,title,scratchpad,frame,display,space,stack-index,has-focus,"
+        + "is-visible,is-minimized,is-hidden,is-floating,is-native-fullscreen"
 
     enum CodingKeys: String, CodingKey {
-        case id, pid, app, title, frame, display, space
+        case id, pid, app, title, scratchpad, frame, display, space
         case stackIndex = "stack-index"
         case hasFocus = "has-focus"
         case isVisible = "is-visible"

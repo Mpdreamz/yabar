@@ -13,6 +13,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var terminating = false
     private let settings = SettingsWindow()
     private var labels = Preferences.spaceLabels
+    /// yabai's scripting addition was loaded at the last look; scratchpads need it.
+    private var scriptingAddition = ScriptingAddition.isLoaded()
     private var drawnSettings = Preferences.signature
 
     func applicationDidFinishLaunching(_: Notification) {
@@ -35,9 +37,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if !changes.added.isEmpty || !changes.removed.isEmpty || changes.spaces { makeRoom() }
         }
         session.onSnapshot = { [weak self] old, new in self?.autoStack(from: old, to: new) }
+        session.onHeartbeat = { [weak self] in self?.checkScriptingAddition() }
         session.onRestart = { [weak self] in
             guard let self else { return }
             Task { await keeper.forget() }
+            syncScratchpads()
         }
         // A display added, removed or rearranged moves every stack's screen position.
         NotificationCenter.default.addObserver(
@@ -54,12 +58,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         quitOnSignals()
         session.start()
         drawSpaces()
+        syncScratchpads()
     }
 
     func applicationShouldTerminate(_: NSApplication) -> NSApplication.TerminateReply {
         guard !terminating else { return .terminateLater }
         terminating = true
         Task {
+            await removeScratchpadRules()
             await keeper.restore(session.snapshot)
             Preferences.roomSpaces = await keeper.changed
             await session.stop()
@@ -134,6 +140,120 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         drawSpaces()
         overlays?.redraw(session.snapshot)
         makeRoom()
+        syncScratchpads()
+    }
+
+    // MARK: Scratchpads
+
+    /// Notices the scripting addition being loaded (or gone): scratchpads switch on or off with it.
+    private func checkScriptingAddition() {
+        let loaded = ScriptingAddition.isLoaded()
+        guard loaded != scriptingAddition else { return }
+        scriptingAddition = loaded
+        syncScratchpads()
+    }
+
+    /// yabai's rules to match the scratchpads in Settings, when the scripting addition is there to honour them.
+    private func syncScratchpads() {
+        guard !terminating, scriptingAddition else { return }
+        let scratchpads = Preferences.scratchpads
+        Task { [session] in
+            guard let existing = try? await session.yabai.ruleLabels() else { return }
+            for command in Scratchpads.sync(scratchpads, existing: existing) {
+                _ = try? await session.yabai.run(command)
+            }
+        }
+    }
+
+    /// Takes Yabar's scratchpad rules back out of yabai, as it does its signals. Windows stay scratchpads.
+    private func removeScratchpadRules() async {
+        guard let existing = try? await session.yabai.ruleLabels() else { return }
+        for command in Scratchpads.sync([], existing: existing) {
+            _ = try? await session.yabai.run(command)
+        }
+    }
+
+    private func scratchpadMenu() -> NSMenuItem? {
+        guard scriptingAddition, let snapshot = session.snapshot else { return nil }
+        let item = NSMenuItem(title: "Scratchpads", action: nil, keyEquivalent: "")
+        let submenu = NSMenu()
+        let showing = Scratchpads.showing(in: snapshot)
+        for scratchpad in Preferences.scratchpads {
+            let entry = NSMenuItem(title: scratchpad.name, action: #selector(toggleScratchpad(_:)), keyEquivalent: "")
+            entry.target = self
+            entry.representedObject = scratchpad.name
+            entry.state = showing.contains(scratchpad.name) ? .on : .off
+            submenu.addItem(entry)
+        }
+        if !Preferences.scratchpads.isEmpty { submenu.addItem(.separator()) }
+        let make = NSMenuItem(
+            title: "Make This Window a Scratchpad…",
+            action: #selector(makeScratchpad),
+            keyEquivalent: ""
+        )
+        make.target = self
+        make.isEnabled = snapshot.windows.contains(where: \.hasFocus)
+        submenu.addItem(make)
+        let recover = NSMenuItem(
+            title: "Bring Back All Scratchpads",
+            action: #selector(recoverScratchpads),
+            keyEquivalent: ""
+        )
+        recover.target = self
+        submenu.addItem(recover)
+        submenu.autoenablesItems = false
+        item.submenu = submenu
+        return item
+    }
+
+    @objc private func toggleScratchpad(_ item: NSMenuItem) {
+        guard let name = item.representedObject as? String, let snapshot = session.snapshot,
+              let scratchpad = Preferences.scratchpads.first(where: { $0.name == name })
+        else { return }
+        switch scratchpad.action(in: snapshot) {
+        case let .toggle(command): run([command])
+        case let .launch(app): Scratchpad.launch(app)
+        case .unclaimed:
+            let alert = NSAlert()
+            alert.messageText = "No \(scratchpad.app) window is \"\(name)\" yet"
+            alert.informativeText = "A new \(scratchpad.app) window becomes it as it opens, or choose Make This Window a "
+                + "Scratchpad… on the one you want."
+            NSApp.activate()
+            alert.runModal()
+        }
+    }
+
+    /// Makes the focused window a scratchpad under a name, and keeps that name for its app in Settings.
+    @objc private func makeScratchpad() {
+        guard let window = session.snapshot?.windows.first(where: \.hasFocus) else { return }
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
+        field.placeholderString = "e.g. term, notes"
+        let previous = NSWorkspace.shared.frontmostApplication
+        defer { if previous?.processIdentifier != ProcessInfo.processInfo.processIdentifier { previous?.activate() } }
+        var problem: String?
+        repeat {
+            let alert = NSAlert()
+            alert.messageText = "Make \(window.app) a Scratchpad"
+            alert.informativeText = problem ?? "Then show and hide it with yabar scratchpad <name>, from skhd say."
+            alert.accessoryView = field
+            alert.addButton(withTitle: "Make Scratchpad")
+            alert.addButton(withTitle: "Cancel")
+            alert.window.initialFirstResponder = field
+            NSApp.activate()
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+            let scratchpad = Scratchpad(name: field.stringValue.trimmingCharacters(in: .whitespaces), app: window.app)
+            problem = scratchpad.problem
+            if problem == nil {
+                var scratchpads = Preferences.scratchpads.filter { $0.name != scratchpad.name }
+                scratchpads.append(scratchpad)
+                Preferences.scratchpads = scratchpads
+                run(scratchpad.assign(window: window.id))
+            }
+        } while problem != nil
+    }
+
+    @objc private func recoverScratchpads() {
+        run([["window", "--scratchpad", "recover"]])
     }
 
     // MARK: The menu
@@ -153,6 +273,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             label.target = self
             menu.addItem(label)
         }
+        if let scratchpads = scratchpadMenu() { menu.addItem(scratchpads) }
         menu.addItem(indicatorMenu())
         let settingsItem = NSMenuItem(title: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
         settingsItem.target = self
@@ -309,7 +430,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func showSettings() {
-        settings.show(scopes: ProfileScope.all(for: session.snapshot, profiles: Preferences.profiles))
+        scriptingAddition = ScriptingAddition.isLoaded()
+        settings.show(
+            scopes: ProfileScope.all(for: session.snapshot, profiles: Preferences.profiles),
+            scriptingAddition: scriptingAddition
+        )
     }
 
     @objc private func checkForUpdates() {

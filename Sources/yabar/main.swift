@@ -9,6 +9,7 @@ let usage = """
 usage: yabar focus <west|east|north|south>  [--axis horizontal|vertical]
        yabar focus <next|prev>
        yabar focus attention
+       yabar scratchpad <name>
        yabar --version
 
   focus west|east|north|south
@@ -22,6 +23,10 @@ usage: yabar focus <west|east|north|south>  [--axis horizontal|vertical]
   focus attention
       The next window, on any space, whose title says it wants attention: it starts with 🔔 (a terminal's bell, in
       Ghostty) or a count like (3). Fails when there is none.
+
+  scratchpad <name>
+      Show or hide a scratchpad set up in Yabar's settings (yabai's own scratchpads: they need its scripting
+      addition). When its app is not running yet, launch it; its first window becomes the scratchpad.
 
   skhd, for example:
       lcmd - h : yabar focus west
@@ -119,6 +124,29 @@ if let flag = args.firstIndex(of: "--axis") {
     }
     axis = value
     args.removeSubrange(flag ... flag + 1)
+}
+
+if args.count == 2, args[0] == "scratchpad" {
+    guard ScriptingAddition.isLoaded() else {
+        fail("scratchpads need yabai's scripting addition, and it is not loaded (yabai --load-sa)")
+    }
+    let defaults = UserDefaults(suiteName: "io.github.mpdreamz.yabar")
+    guard let scratchpad = Scratchpads.stored(in: defaults).first(where: { $0.name == args[1] }) else {
+        fail("no scratchpad \"\(args[1])\"; set one up in Yabar's settings or menu", code: 2)
+    }
+    let snapshot: Snapshot
+    do { snapshot = try await Yabai().snapshot() } catch { fail("yabai: \(error)") }
+    switch scratchpad.action(in: snapshot) {
+    case let .toggle(command):
+        do { try await Yabai().run(command) } catch { fail("yabai: \(error)") }
+    case let .launch(app):
+        Scratchpad.launch(app)
+    case .unclaimed:
+        fail(
+            "no \(scratchpad.app) window is \"\(scratchpad.name)\" yet: a new one becomes it, or use Make This Window a Scratchpad… in Yabar's menu"
+        )
+    }
+    exit(0)
 }
 
 guard args.count == 2, args[0] == "focus" else { fail("unknown command; see yabar --help", code: 2) }
