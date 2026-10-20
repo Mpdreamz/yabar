@@ -31,3 +31,11 @@ Merges to main keep a draft release up to date. `gh workflow run release` builds
 notarizes and staples it, writes a signed appcast for Sparkle, publishes the draft and bumps
 `mpdreamz/homebrew-tap`. Secrets are stored with `scripts/release-secrets.sh` (run by the owner, never by an agent);
 the Sparkle private key lives in the owner's keychain under the account `yabar` and is never handled here.
+
+## Docs
+
+`docs/` is a docs-builder site with `docs/yabar-landing.html` over its home page, published to GitHub Pages
+(`https://mpdreamz.github.io/yabar/`, so links carry the `/yabar/` prefix) by `.github/workflows/docs.yml` on every
+merge; `mise run docs` builds it the same way. Every image in `docs/images`, the README's and the app icon
+(`Resources/Yabar.icns`) are drawn by Yabar from fixed fixtures (`Sources/YabarApp/Shots.swift`, `Brand.swift`): change
+what they show and run `mise run shots`, never a screenshot of a real desktop. Docs claim only what is built.

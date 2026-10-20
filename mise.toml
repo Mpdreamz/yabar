@@ -33,3 +33,12 @@ run = ["swift build -c release", "scripts/bundle.sh release"]
 [tasks.deploy]
 description = "Copy build/Yabar.app to YABAR_DEPLOY_DIR (set it in mise.local.toml)"
 run = "scripts/deploy.sh"
+
+[tasks.shots]
+description = "Draw every docs, landing page and README image, and the app icon (scripts/shots.sh)"
+depends = ["bundle"]
+run = "scripts/shots.sh"
+
+[tasks.docs]
+description = "Build the docs as CI does (docs-builder + landing page) and serve them on :4000 (-- --noserve to only build)"
+run = "scripts/docs.sh"
