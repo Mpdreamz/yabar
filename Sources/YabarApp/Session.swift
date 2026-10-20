@@ -21,6 +21,8 @@ final class Session {
     var onChange: ((Changes) -> Void)?
     /// yabai restarted (or came back): whatever Yabar set in it is gone.
     var onRestart: (() -> Void)?
+    /// `yabar launcher` asked for the launcher (a "launcher" line on Yabar's socket).
+    var onLauncher: (() -> Void)?
     /// Every heartbeat (a few seconds), for checks nothing announces: the scripting addition being loaded, say.
     var onHeartbeat: (() -> Void)?
     /// Every new snapshot with the one before it, to act on what appeared in between (`AutoStack`).
@@ -39,6 +41,10 @@ final class Session {
         }
         Task { [listener, refresher, weak self] in
             for await poke in listener.pokes {
+                if poke.event == "launcher" {
+                    self?.onLauncher?()
+                    continue
+                }
                 if poke.needsSignalsAgain { await self?.addSignals() }
                 await refresher.poke()
             }

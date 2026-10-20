@@ -48,3 +48,20 @@ window of that app becomes the scratchpad as it opens, or choose Make This Windo
 ```sh
 lcmd - t : yabar scratchpad term   # show or hide it; launches the app when it is not running
 ```
+
+## Launcher
+
+```sh
+lcmd - space : yabar launcher
+```
+
+One search over the windows on every space, stacks, scratchpads, installed apps, and Yabar's and yabai's commands.
+Each row has its app's icon and badges for its space, its place in a stack, a scratchpad, or attention.
+
+- Enter goes to the window (and its space), shows a scratchpad, runs a command, or opens the app (its last window when
+  it is running). With nothing matching, Enter opens the best matching app.
+- Cmd+Enter opens a new copy of the app (`open -n`).
+- `>` runs the rest as a yabai command: `> window --toggle float`.
+- Picks you make often rank higher. Esc closes it and gives focus back.
+
+`yabar launcher` starts Yabar.app first when it is not running.

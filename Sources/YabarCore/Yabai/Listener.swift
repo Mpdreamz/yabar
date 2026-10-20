@@ -44,6 +44,18 @@ public final class Listener: @unchecked Sendable {
         self.source = source
     }
 
+    /// Writes one line to a listener (another process's), as a signal does. False when nothing listens there.
+    public static func send(_ line: String, to path: String) -> Bool {
+        let fd = socket(AF_UNIX, SOCK_STREAM, 0)
+        guard fd >= 0 else { return false }
+        defer { close(fd) }
+        var on: Int32 = 1
+        setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))
+        guard var address = UnixAddress(path), address.withSockaddr({ connect(fd, $0, $1) }) == 0 else { return false }
+        let bytes = Array((line + "\n").utf8)
+        return Darwin.send(fd, bytes, bytes.count, 0) == bytes.count
+    }
+
     public func stop() {
         source?.cancel()
         source = nil
