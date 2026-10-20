@@ -84,8 +84,8 @@ private struct SettingsView: View {
     let scriptingAddition: Bool
     /// Whether the updater runs: a release build's does; the docs' picture shows one.
     var updates = Updater.shared.isRunning
-    /// Drawn offscreen for the docs (`Shots`): solid colours in place of the sidebar's material, which such a picture can't
-    /// draw, and open at login on as a release build has it, without registering this Mac's.
+    /// Drawn offscreen for the docs (`Shots`): solid colours in place of the sidebar's material, which such a picture
+    /// can't draw, and open at login on as a release build has it, without registering this Mac's.
     var picture = false
     @State var pane: SettingsPane = .menuBar
     @AppStorage(Preferences.Key.showLabels) private var showLabels = true
@@ -111,7 +111,8 @@ private struct SettingsView: View {
                 set: { if let new = $0 { pane = new } }
             )) { row in
                 if picture {
-                    // An offscreen window is never key, so its sidebar draws as inactive: give it an active one's colours.
+                    // An offscreen window is never key, so its sidebar draws as inactive: give it an active
+                    // one's colours.
                     Label(row.title, systemImage: row.symbol)
                         .foregroundStyle(Color.white.opacity(0.88))
                         .tag(row)
