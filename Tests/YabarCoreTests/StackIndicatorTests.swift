@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import YabarCore
 
+@Suite(.timeLimit(.minutes(1)))
 struct StackTopsTests {
     @Test func theFocusedWindowIsOnTop() throws {
         var tops = StackTops()
@@ -43,6 +44,7 @@ struct StackTopsTests {
     }
 }
 
+@Suite(.timeLimit(.minutes(1)))
 struct IndicatorLayoutTests {
     @Test func besideALeftStack() throws {
         let stack = try Fixtures.snapshot().stacks[0]
@@ -73,6 +75,7 @@ struct IndicatorLayoutTests {
     }
 }
 
+@Suite(.timeLimit(.minutes(1)))
 struct StackPlacementTests {
     /// Space 1's stack with a window on every side of it.
     func boxedIn() throws -> Snapshot {
@@ -113,6 +116,7 @@ struct StackPlacementTests {
     }
 }
 
+@Suite(.timeLimit(.minutes(1)))
 struct RoomTests {
     let base = Room(top: 0, bottom: 0, left: 0, right: 0, gap: 0)
 
@@ -149,6 +153,7 @@ struct RoomTests {
     }
 }
 
+@Suite(.timeLimit(.minutes(1)))
 struct SpaceKeeperTests {
     static func fake() throws -> FakeYabai {
         try FakeYabai { args in
@@ -234,6 +239,7 @@ struct SpaceKeeperTests {
     }
 }
 
+@Suite(.timeLimit(.minutes(1)))
 struct ProfilesTests {
     @Test func broadToSpecific() throws {
         let snapshot = try Fixtures.snapshot()
@@ -273,6 +279,7 @@ struct ProfilesTests {
     }
 }
 
+@Suite(.timeLimit(.minutes(1)))
 struct TabsTests {
     @Test func theyShareTheWholeWidth() throws {
         let stack = try Fixtures.snapshot().stacks[0]
@@ -313,6 +320,7 @@ struct TabsTests {
     }
 }
 
+@Suite(.timeLimit(.minutes(1)))
 struct AttentionTests {
     @Test func readsBellsAndCounts() {
         #expect(Attention(title: "🔔 ✳ Claude Code") == Attention())

@@ -1,6 +1,7 @@
 import Testing
 @testable import YabarCore
 
+@Suite(.timeLimit(.minutes(1)))
 struct BuildInfoTests {
     @Test func readsTheBundle() {
         let info = BuildInfo(info: [

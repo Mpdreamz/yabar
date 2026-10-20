@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import YabarCore
 
+@Suite(.timeLimit(.minutes(1)))
 struct MessageTests {
     @Test func encodesLikeYabaiMsg() {
         let data = YabaiMessage.encode(["query", "--spaces"])
@@ -20,6 +21,7 @@ struct MessageTests {
     }
 }
 
+@Suite(.timeLimit(.minutes(1)))
 struct ModelTests {
     @Test func decodesYabaisJSON() throws {
         let snapshot = try Fixtures.snapshot()
@@ -39,6 +41,7 @@ struct ModelTests {
     }
 }
 
+@Suite(.timeLimit(.minutes(1)))
 struct StackTests {
     @Test func groupsBySpaceAndFrame() throws {
         let stacks = try Fixtures.snapshot().stacks
@@ -66,6 +69,7 @@ struct StackTests {
     }
 }
 
+@Suite(.timeLimit(.minutes(1)))
 struct ChangesTests {
     @Test func theFirstSnapshotAddsEverything() throws {
         let changes = try Changes(from: nil, to: Fixtures.snapshot())
@@ -113,6 +117,7 @@ struct ChangesTests {
     }
 }
 
+@Suite(.timeLimit(.minutes(1)))
 struct SignalTests {
     @Test func labelledAndPointedAtTheListener() {
         let args = Signals.add("window_focused", listener: "/tmp/yabar_me.socket")
@@ -130,6 +135,7 @@ struct SignalTests {
     }
 }
 
+@Suite(.timeLimit(.minutes(1)))
 struct SocketTests {
     @Test func snapshotOverTheSocket() async throws {
         let fake = try FakeYabai { args in
@@ -197,6 +203,7 @@ struct SocketTests {
     }
 }
 
+@Suite(.timeLimit(.minutes(1)))
 struct ListenerTests {
     /// The signal's own command line, run by a shell as yabai runs it, reaches the listener.
     @Test func aSignalActionPokesTheListener() async throws {
@@ -214,6 +221,7 @@ struct ListenerTests {
     }
 }
 
+@Suite(.timeLimit(.minutes(1)))
 struct RefresherTests {
     actor Counter {
         var count = 0

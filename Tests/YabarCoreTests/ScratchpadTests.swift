@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import YabarCore
 
+@Suite(.timeLimit(.minutes(1)))
 struct ScratchpadTests {
     let term = Scratchpad(name: "term", app: "Ghostty")
 
